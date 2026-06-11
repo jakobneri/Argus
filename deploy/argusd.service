@@ -1,0 +1,26 @@
+[Unit]
+Description=argus daemon — privileged backend of the argus server console
+Documentation=https://github.com/jakobneri/argus
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=/usr/local/bin/argusd --socket /run/argus/argusd.sock
+Restart=on-failure
+RestartSec=2
+
+# Socket directory: /run/argus, owned root:argus, group-writable so the
+# daemon can create the socket and group members can connect.
+RuntimeDirectory=argus
+RuntimeDirectoryMode=0750
+Group=argus
+UMask=0007
+
+# Hardening (the daemon is privileged, but does not need more than this in M0).
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
