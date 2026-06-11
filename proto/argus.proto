@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package argus.v1;
+
+option go_package = "github.com/jakobneri/argus/proto/argusv1";
+
+// Argus is the control-plane API of argusd. In M0 it only answers Ping.
+service Argus {
+  // Note: fully qualified, because inside the service block the bare name
+  // "Ping" resolves to the method itself, not the message.
+  rpc Ping(.argus.v1.Ping) returns (Pong);
+}
+
+message Ping {}
+
+message Pong {}

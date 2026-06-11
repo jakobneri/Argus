@@ -1,0 +1,19 @@
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+  except:
+    # M0: rpc Ping(Ping) returns (Pong) is mandated by the spec; the
+    # request/response naming rules would force PingRequest/PingResponse.
+    - RPC_REQUEST_RESPONSE_UNIQUE
+    - RPC_REQUEST_STANDARD_NAME
+    - RPC_RESPONSE_STANDARD_NAME
+    # The repo layout mandates proto/argus.proto (no argus/v1/ subdirectory)
+    # and a service named "Argus".
+    - PACKAGE_DIRECTORY_MATCH
+    - SERVICE_SUFFIX
+breaking:
+  use:
+    - FILE
