@@ -1,0 +1,11 @@
+# build artifacts
+/bin/
+
+# coverage / test output
+*.out
+*.test
+
+# editor noise
+.idea/
+.vscode/
+*.swp

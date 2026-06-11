@@ -1,0 +1,28 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - misspell
+    - revive
+    - unconvert
+    - wrapcheck
+  settings:
+    wrapcheck:
+      ignore-sigs:
+        - .Errorf(
+        - errors.New(
+        - errors.Join(
+        - errors.Unwrap(
+  exclusions:
+    generated: lax
+    paths:
+      - proto/argusv1
+
+formatters:
+  enable:
+    - gofumpt
+  exclusions:
+    paths:
+      - proto/argusv1
