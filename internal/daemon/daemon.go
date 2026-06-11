@@ -15,10 +15,14 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/jakobneri/argus/internal/api"
+	"github.com/jakobneri/argus/internal/containers"
+	"github.com/jakobneri/argus/internal/services"
 	argusv1 "github.com/jakobneri/argus/proto/argusv1"
+	"github.com/jakobneri/argus/tui"
 )
 
-// Daemon is the privileged argusd core. In M0 it only serves the Ping RPC.
+// Daemon is the privileged argusd core. It serves the read-only inventory
+// API and hosts headless TUI sessions over the Attach stream.
 type Daemon struct {
 	socketPath string
 	log        *slog.Logger
@@ -49,8 +53,16 @@ func (d *Daemon) Run(ctx context.Context) error {
 		return fmt.Errorf("chmod socket %s: %w", d.socketPath, err)
 	}
 
+	// The daemon renders headless TUI frames to a stream, not a TTY, so the
+	// color profile cannot be autodetected and is forced instead.
+	tui.ForceColors()
+
 	srv := grpc.NewServer()
-	argusv1.RegisterArgusServer(srv, api.NewServer())
+	argusv1.RegisterArgusServer(srv, api.NewServer(
+		services.NewSystemdManager(),
+		containers.NewDockerManager(),
+		d.log,
+	))
 
 	errCh := make(chan error, 1)
 	go func() {

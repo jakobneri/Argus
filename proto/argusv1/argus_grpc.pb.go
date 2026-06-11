@@ -19,18 +19,28 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Argus_Ping_FullMethodName = "/argus.v1.Argus/Ping"
+	Argus_Ping_FullMethodName         = "/argus.v1.Argus/Ping"
+	Argus_GetInventory_FullMethodName = "/argus.v1.Argus/GetInventory"
+	Argus_Attach_FullMethodName       = "/argus.v1.Argus/Attach"
 )
 
 // ArgusClient is the client API for Argus service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Argus is the control-plane API of argusd. In M0 it only answers Ping.
+// Argus is the control-plane API of argusd.
 type ArgusClient interface {
-	// Note: fully qualified, because inside the service block the bare name
-	// "Ping" resolves to the method itself, not the message.
-	Ping(ctx context.Context, in *Ping, opts ...grpc.CallOption) (*Pong, error)
+	// Ping answers a liveness probe.
+	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
+	// GetInventory returns a read-only snapshot of systemd services and Docker
+	// containers. This RPC is the external API surface (e.g. for MCP consumers);
+	// the in-daemon TUI calls the module interfaces directly in-process.
+	GetInventory(ctx context.Context, in *GetInventoryRequest, opts ...grpc.CallOption) (*GetInventoryResponse, error)
+	// Attach runs one ephemeral headless TUI session inside the daemon.
+	// Client -> daemon: raw stdin bytes and terminal resize events.
+	// Daemon -> client: rendered terminal frames (ANSI bytes).
+	// The session ends when the TUI program exits or the stream closes.
+	Attach(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AttachRequest, AttachResponse], error)
 }
 
 type argusClient struct {
@@ -41,9 +51,9 @@ func NewArgusClient(cc grpc.ClientConnInterface) ArgusClient {
 	return &argusClient{cc}
 }
 
-func (c *argusClient) Ping(ctx context.Context, in *Ping, opts ...grpc.CallOption) (*Pong, error) {
+func (c *argusClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Pong)
+	out := new(PingResponse)
 	err := c.cc.Invoke(ctx, Argus_Ping_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -51,15 +61,46 @@ func (c *argusClient) Ping(ctx context.Context, in *Ping, opts ...grpc.CallOptio
 	return out, nil
 }
 
+func (c *argusClient) GetInventory(ctx context.Context, in *GetInventoryRequest, opts ...grpc.CallOption) (*GetInventoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetInventoryResponse)
+	err := c.cc.Invoke(ctx, Argus_GetInventory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *argusClient) Attach(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AttachRequest, AttachResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Argus_ServiceDesc.Streams[0], Argus_Attach_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[AttachRequest, AttachResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Argus_AttachClient = grpc.BidiStreamingClient[AttachRequest, AttachResponse]
+
 // ArgusServer is the server API for Argus service.
 // All implementations must embed UnimplementedArgusServer
 // for forward compatibility.
 //
-// Argus is the control-plane API of argusd. In M0 it only answers Ping.
+// Argus is the control-plane API of argusd.
 type ArgusServer interface {
-	// Note: fully qualified, because inside the service block the bare name
-	// "Ping" resolves to the method itself, not the message.
-	Ping(context.Context, *Ping) (*Pong, error)
+	// Ping answers a liveness probe.
+	Ping(context.Context, *PingRequest) (*PingResponse, error)
+	// GetInventory returns a read-only snapshot of systemd services and Docker
+	// containers. This RPC is the external API surface (e.g. for MCP consumers);
+	// the in-daemon TUI calls the module interfaces directly in-process.
+	GetInventory(context.Context, *GetInventoryRequest) (*GetInventoryResponse, error)
+	// Attach runs one ephemeral headless TUI session inside the daemon.
+	// Client -> daemon: raw stdin bytes and terminal resize events.
+	// Daemon -> client: rendered terminal frames (ANSI bytes).
+	// The session ends when the TUI program exits or the stream closes.
+	Attach(grpc.BidiStreamingServer[AttachRequest, AttachResponse]) error
 	mustEmbedUnimplementedArgusServer()
 }
 
@@ -70,8 +111,14 @@ type ArgusServer interface {
 // pointer dereference when methods are called.
 type UnimplementedArgusServer struct{}
 
-func (UnimplementedArgusServer) Ping(context.Context, *Ping) (*Pong, error) {
+func (UnimplementedArgusServer) Ping(context.Context, *PingRequest) (*PingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
+func (UnimplementedArgusServer) GetInventory(context.Context, *GetInventoryRequest) (*GetInventoryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetInventory not implemented")
+}
+func (UnimplementedArgusServer) Attach(grpc.BidiStreamingServer[AttachRequest, AttachResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method Attach not implemented")
 }
 func (UnimplementedArgusServer) mustEmbedUnimplementedArgusServer() {}
 func (UnimplementedArgusServer) testEmbeddedByValue()               {}
@@ -95,7 +142,7 @@ func RegisterArgusServer(s grpc.ServiceRegistrar, srv ArgusServer) {
 }
 
 func _Argus_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Ping)
+	in := new(PingRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -107,10 +154,35 @@ func _Argus_Ping_Handler(srv interface{}, ctx context.Context, dec func(interfac
 		FullMethod: Argus_Ping_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ArgusServer).Ping(ctx, req.(*Ping))
+		return srv.(ArgusServer).Ping(ctx, req.(*PingRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _Argus_GetInventory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetInventoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ArgusServer).GetInventory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Argus_GetInventory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ArgusServer).GetInventory(ctx, req.(*GetInventoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Argus_Attach_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ArgusServer).Attach(&grpc.GenericServerStream[AttachRequest, AttachResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Argus_AttachServer = grpc.BidiStreamingServer[AttachRequest, AttachResponse]
 
 // Argus_ServiceDesc is the grpc.ServiceDesc for Argus service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -123,7 +195,18 @@ var Argus_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Ping",
 			Handler:    _Argus_Ping_Handler,
 		},
+		{
+			MethodName: "GetInventory",
+			Handler:    _Argus_GetInventory_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Attach",
+			Handler:       _Argus_Attach_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "argus.proto",
 }
