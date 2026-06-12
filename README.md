@@ -7,13 +7,17 @@ ARM64, generic Linux otherwise). Privilege-separated architecture:
 |-------------|-----------------------------------------------------------------------|
 | `argusd`    | Privileged daemon. Owns all state, executes all (later privileged) actions, serves gRPC on a Unix domain socket. |
 | `argus`     | Unprivileged terminal bridge. gRPC + rendering only — no logic.       |
-| `argus-mcp` | MCP bridge. Empty stub in M0.                                         |
+| `argus-mcp` | MCP bridge. Empty stub until M7.                                      |
 
-## Status: M0 — scaffold & tooling
+## Status: M1 — read-only inventory + headless TUI
 
-`argusd` listens on `/run/argus/argusd.sock` and answers a `Ping` RPC.
-`argus` connects, pings, and renders the Argus splash. Everything else
-(sessions, services, containers, metrics, logs, audit, MCP) comes in later
+`argusd` listens on `/run/argus/argusd.sock` and serves three RPCs: `Ping`,
+`GetInventory` (snapshot of systemd services + Docker containers) and
+`Attach`, a bidirectional stream that hosts one ephemeral headless Bubble Tea
+dashboard per connection. `argus` puts the terminal into raw mode, attaches,
+forwards stdin bytes and resizes upstream and writes rendered frames to
+stdout; `q` quits. Everything is read-only — no mutations until M4. Metrics,
+logs, persistent sessions, detach/reattach, panes etc. come in later
 milestones.
 
 ## Building
@@ -40,7 +44,7 @@ with `--socket` or the `ARGUS_SOCKET` environment variable:
 ./bin/argusd --socket /tmp/argusd.sock
 
 # terminal 2
-./bin/argus --socket /tmp/argusd.sock   # ping -> pong -> splash
+./bin/argus --socket /tmp/argusd.sock   # attaches to the live dashboard; q quits
 ```
 
 ## Deploying
@@ -54,9 +58,15 @@ the socket.
 
 - **Codegen via buf** (pure Go, reproducible): `buf.yaml` + `buf.gen.yaml` at
   the repo root, output into `proto/argusv1`. No protoc required.
-- The spec mandates `rpc Ping(Ping) returns (Pong)`; inside a proto service
-  block the bare name `Ping` would resolve to the method, so the request type
-  is referenced fully qualified (`.argus.v1.Ping`). The corresponding buf lint
-  naming rules are disabled in `buf.yaml`.
+- **One integration surface at module level**: the in-daemon TUI calls the
+  module interfaces (`services.Manager`, `containers.Manager`) directly
+  in-process — not via self-gRPC. The `GetInventory` RPC wraps the same
+  interfaces and is the external API surface (MCP/automation later).
+- The daemon renders the TUI headless onto the Attach stream (no TTY):
+  resizes are injected as `tea.WindowSizeMsg` from client resize events, and
+  the lipgloss color profile is pinned to ANSI 256 since terminal
+  capabilities cannot be autodetected.
+- An unreachable Docker daemon is non-fatal: the service list still renders
+  and a hint is shown; `GetInventory` sets `container_error`.
 - Socket permissions: directory 0750 root:argus, socket 0660 — the daemon is
   reachable only by root and the `argus` group.

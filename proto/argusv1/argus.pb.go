@@ -21,26 +21,26 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Ping struct {
+type PingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Ping) Reset() {
-	*x = Ping{}
+func (x *PingRequest) Reset() {
+	*x = PingRequest{}
 	mi := &file_argus_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Ping) String() string {
+func (x *PingRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Ping) ProtoMessage() {}
+func (*PingRequest) ProtoMessage() {}
 
-func (x *Ping) ProtoReflect() protoreflect.Message {
+func (x *PingRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_argus_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -52,31 +52,31 @@ func (x *Ping) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Ping.ProtoReflect.Descriptor instead.
-func (*Ping) Descriptor() ([]byte, []int) {
+// Deprecated: Use PingRequest.ProtoReflect.Descriptor instead.
+func (*PingRequest) Descriptor() ([]byte, []int) {
 	return file_argus_proto_rawDescGZIP(), []int{0}
 }
 
-type Pong struct {
+type PingResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Pong) Reset() {
-	*x = Pong{}
+func (x *PingResponse) Reset() {
+	*x = PingResponse{}
 	mi := &file_argus_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Pong) String() string {
+func (x *PingResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Pong) ProtoMessage() {}
+func (*PingResponse) ProtoMessage() {}
 
-func (x *Pong) ProtoReflect() protoreflect.Message {
+func (x *PingResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_argus_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -88,20 +88,477 @@ func (x *Pong) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Pong.ProtoReflect.Descriptor instead.
-func (*Pong) Descriptor() ([]byte, []int) {
+// Deprecated: Use PingResponse.ProtoReflect.Descriptor instead.
+func (*PingResponse) Descriptor() ([]byte, []int) {
 	return file_argus_proto_rawDescGZIP(), []int{1}
+}
+
+type GetInventoryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetInventoryRequest) Reset() {
+	*x = GetInventoryRequest{}
+	mi := &file_argus_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetInventoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetInventoryRequest) ProtoMessage() {}
+
+func (x *GetInventoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetInventoryRequest.ProtoReflect.Descriptor instead.
+func (*GetInventoryRequest) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{2}
+}
+
+type GetInventoryResponse struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Services   []*ServiceUnit         `protobuf:"bytes,1,rep,name=services,proto3" json:"services,omitempty"`
+	Containers []*Container           `protobuf:"bytes,2,rep,name=containers,proto3" json:"containers,omitempty"`
+	// Non-fatal hint set when the Docker daemon is unreachable; containers is
+	// empty in that case.
+	ContainerError string `protobuf:"bytes,3,opt,name=container_error,json=containerError,proto3" json:"container_error,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetInventoryResponse) Reset() {
+	*x = GetInventoryResponse{}
+	mi := &file_argus_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetInventoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetInventoryResponse) ProtoMessage() {}
+
+func (x *GetInventoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetInventoryResponse.ProtoReflect.Descriptor instead.
+func (*GetInventoryResponse) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetInventoryResponse) GetServices() []*ServiceUnit {
+	if x != nil {
+		return x.Services
+	}
+	return nil
+}
+
+func (x *GetInventoryResponse) GetContainers() []*Container {
+	if x != nil {
+		return x.Containers
+	}
+	return nil
+}
+
+func (x *GetInventoryResponse) GetContainerError() string {
+	if x != nil {
+		return x.ContainerError
+	}
+	return ""
+}
+
+// ServiceUnit describes one systemd unit.
+type ServiceUnit struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	LoadState     string                 `protobuf:"bytes,3,opt,name=load_state,json=loadState,proto3" json:"load_state,omitempty"`
+	ActiveState   string                 `protobuf:"bytes,4,opt,name=active_state,json=activeState,proto3" json:"active_state,omitempty"`
+	SubState      string                 `protobuf:"bytes,5,opt,name=sub_state,json=subState,proto3" json:"sub_state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ServiceUnit) Reset() {
+	*x = ServiceUnit{}
+	mi := &file_argus_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ServiceUnit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServiceUnit) ProtoMessage() {}
+
+func (x *ServiceUnit) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServiceUnit.ProtoReflect.Descriptor instead.
+func (*ServiceUnit) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ServiceUnit) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ServiceUnit) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ServiceUnit) GetLoadState() string {
+	if x != nil {
+		return x.LoadState
+	}
+	return ""
+}
+
+func (x *ServiceUnit) GetActiveState() string {
+	if x != nil {
+		return x.ActiveState
+	}
+	return ""
+}
+
+func (x *ServiceUnit) GetSubState() string {
+	if x != nil {
+		return x.SubState
+	}
+	return ""
+}
+
+// Container describes one Docker container.
+type Container struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Image         string                 `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
+	State         string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Container) Reset() {
+	*x = Container{}
+	mi := &file_argus_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Container) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Container) ProtoMessage() {}
+
+func (x *Container) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Container.ProtoReflect.Descriptor instead.
+func (*Container) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Container) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Container) GetImage() string {
+	if x != nil {
+		return x.Image
+	}
+	return ""
+}
+
+func (x *Container) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *Container) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type AttachRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Event:
+	//
+	//	*AttachRequest_Input
+	//	*AttachRequest_Resize
+	Event         isAttachRequest_Event `protobuf_oneof:"event"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AttachRequest) Reset() {
+	*x = AttachRequest{}
+	mi := &file_argus_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttachRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttachRequest) ProtoMessage() {}
+
+func (x *AttachRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttachRequest.ProtoReflect.Descriptor instead.
+func (*AttachRequest) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AttachRequest) GetEvent() isAttachRequest_Event {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+func (x *AttachRequest) GetInput() []byte {
+	if x != nil {
+		if x, ok := x.Event.(*AttachRequest_Input); ok {
+			return x.Input
+		}
+	}
+	return nil
+}
+
+func (x *AttachRequest) GetResize() *Resize {
+	if x != nil {
+		if x, ok := x.Event.(*AttachRequest_Resize); ok {
+			return x.Resize
+		}
+	}
+	return nil
+}
+
+type isAttachRequest_Event interface {
+	isAttachRequest_Event()
+}
+
+type AttachRequest_Input struct {
+	// Raw stdin bytes forwarded verbatim to the in-daemon TUI program.
+	Input []byte `protobuf:"bytes,1,opt,name=input,proto3,oneof"`
+}
+
+type AttachRequest_Resize struct {
+	Resize *Resize `protobuf:"bytes,2,opt,name=resize,proto3,oneof"`
+}
+
+func (*AttachRequest_Input) isAttachRequest_Event() {}
+
+func (*AttachRequest_Resize) isAttachRequest_Event() {}
+
+// Resize carries the client terminal dimensions. It must be sent once at the
+// start of the stream and again on every terminal resize, because the daemon
+// side renders to a stream (not a TTY) and cannot autodetect the size.
+type Resize struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cols          uint32                 `protobuf:"varint,1,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows          uint32                 `protobuf:"varint,2,opt,name=rows,proto3" json:"rows,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Resize) Reset() {
+	*x = Resize{}
+	mi := &file_argus_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Resize) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Resize) ProtoMessage() {}
+
+func (x *Resize) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Resize.ProtoReflect.Descriptor instead.
+func (*Resize) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *Resize) GetCols() uint32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+func (x *Resize) GetRows() uint32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+type AttachResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Rendered terminal output (ANSI escape sequences included).
+	Output        []byte `protobuf:"bytes,1,opt,name=output,proto3" json:"output,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AttachResponse) Reset() {
+	*x = AttachResponse{}
+	mi := &file_argus_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttachResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttachResponse) ProtoMessage() {}
+
+func (x *AttachResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttachResponse.ProtoReflect.Descriptor instead.
+func (*AttachResponse) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AttachResponse) GetOutput() []byte {
+	if x != nil {
+		return x.Output
+	}
+	return nil
 }
 
 var File_argus_proto protoreflect.FileDescriptor
 
 const file_argus_proto_rawDesc = "" +
 	"\n" +
-	"\vargus.proto\x12\bargus.v1\"\x06\n" +
-	"\x04Ping\"\x06\n" +
-	"\x04Pong2/\n" +
-	"\x05Argus\x12&\n" +
-	"\x04Ping\x12\x0e.argus.v1.Ping\x1a\x0e.argus.v1.PongB*Z(github.com/jakobneri/argus/proto/argusv1b\x06proto3"
+	"\vargus.proto\x12\bargus.v1\"\r\n" +
+	"\vPingRequest\"\x0e\n" +
+	"\fPingResponse\"\x15\n" +
+	"\x13GetInventoryRequest\"\xa7\x01\n" +
+	"\x14GetInventoryResponse\x121\n" +
+	"\bservices\x18\x01 \x03(\v2\x15.argus.v1.ServiceUnitR\bservices\x123\n" +
+	"\n" +
+	"containers\x18\x02 \x03(\v2\x13.argus.v1.ContainerR\n" +
+	"containers\x12'\n" +
+	"\x0fcontainer_error\x18\x03 \x01(\tR\x0econtainerError\"\xa2\x01\n" +
+	"\vServiceUnit\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1d\n" +
+	"\n" +
+	"load_state\x18\x03 \x01(\tR\tloadState\x12!\n" +
+	"\factive_state\x18\x04 \x01(\tR\vactiveState\x12\x1b\n" +
+	"\tsub_state\x18\x05 \x01(\tR\bsubState\"c\n" +
+	"\tContainer\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05image\x18\x02 \x01(\tR\x05image\x12\x14\n" +
+	"\x05state\x18\x03 \x01(\tR\x05state\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\"\\\n" +
+	"\rAttachRequest\x12\x16\n" +
+	"\x05input\x18\x01 \x01(\fH\x00R\x05input\x12*\n" +
+	"\x06resize\x18\x02 \x01(\v2\x10.argus.v1.ResizeH\x00R\x06resizeB\a\n" +
+	"\x05event\"0\n" +
+	"\x06Resize\x12\x12\n" +
+	"\x04cols\x18\x01 \x01(\rR\x04cols\x12\x12\n" +
+	"\x04rows\x18\x02 \x01(\rR\x04rows\"(\n" +
+	"\x0eAttachResponse\x12\x16\n" +
+	"\x06output\x18\x01 \x01(\fR\x06output2\xce\x01\n" +
+	"\x05Argus\x125\n" +
+	"\x04Ping\x12\x15.argus.v1.PingRequest\x1a\x16.argus.v1.PingResponse\x12M\n" +
+	"\fGetInventory\x12\x1d.argus.v1.GetInventoryRequest\x1a\x1e.argus.v1.GetInventoryResponse\x12?\n" +
+	"\x06Attach\x12\x17.argus.v1.AttachRequest\x1a\x18.argus.v1.AttachResponse(\x010\x01B*Z(github.com/jakobneri/argus/proto/argusv1b\x06proto3"
 
 var (
 	file_argus_proto_rawDescOnce sync.Once
@@ -115,19 +572,33 @@ func file_argus_proto_rawDescGZIP() []byte {
 	return file_argus_proto_rawDescData
 }
 
-var file_argus_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_argus_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_argus_proto_goTypes = []any{
-	(*Ping)(nil), // 0: argus.v1.Ping
-	(*Pong)(nil), // 1: argus.v1.Pong
+	(*PingRequest)(nil),          // 0: argus.v1.PingRequest
+	(*PingResponse)(nil),         // 1: argus.v1.PingResponse
+	(*GetInventoryRequest)(nil),  // 2: argus.v1.GetInventoryRequest
+	(*GetInventoryResponse)(nil), // 3: argus.v1.GetInventoryResponse
+	(*ServiceUnit)(nil),          // 4: argus.v1.ServiceUnit
+	(*Container)(nil),            // 5: argus.v1.Container
+	(*AttachRequest)(nil),        // 6: argus.v1.AttachRequest
+	(*Resize)(nil),               // 7: argus.v1.Resize
+	(*AttachResponse)(nil),       // 8: argus.v1.AttachResponse
 }
 var file_argus_proto_depIdxs = []int32{
-	0, // 0: argus.v1.Argus.Ping:input_type -> argus.v1.Ping
-	1, // 1: argus.v1.Argus.Ping:output_type -> argus.v1.Pong
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	4, // 0: argus.v1.GetInventoryResponse.services:type_name -> argus.v1.ServiceUnit
+	5, // 1: argus.v1.GetInventoryResponse.containers:type_name -> argus.v1.Container
+	7, // 2: argus.v1.AttachRequest.resize:type_name -> argus.v1.Resize
+	0, // 3: argus.v1.Argus.Ping:input_type -> argus.v1.PingRequest
+	2, // 4: argus.v1.Argus.GetInventory:input_type -> argus.v1.GetInventoryRequest
+	6, // 5: argus.v1.Argus.Attach:input_type -> argus.v1.AttachRequest
+	1, // 6: argus.v1.Argus.Ping:output_type -> argus.v1.PingResponse
+	3, // 7: argus.v1.Argus.GetInventory:output_type -> argus.v1.GetInventoryResponse
+	8, // 8: argus.v1.Argus.Attach:output_type -> argus.v1.AttachResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_argus_proto_init() }
@@ -135,13 +606,17 @@ func file_argus_proto_init() {
 	if File_argus_proto != nil {
 		return
 	}
+	file_argus_proto_msgTypes[6].OneofWrappers = []any{
+		(*AttachRequest_Input)(nil),
+		(*AttachRequest_Resize)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_argus_proto_rawDesc), len(file_argus_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

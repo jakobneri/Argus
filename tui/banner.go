@@ -2,7 +2,17 @@
 // free of privileged logic: rendering and presentation only.
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
+)
+
+// ForceColors pins the lipgloss color profile to ANSI 256. The daemon renders
+// headless to an Attach stream (no TTY), so termenv cannot autodetect the
+// client terminal's capabilities; 256 colors is the M1 assumption.
+func ForceColors() {
+	lipgloss.SetColorProfile(termenv.ANSI256)
+}
 
 // Banner is the Argus wordmark rendered as block ASCII art.
 const Banner = `

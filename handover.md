@@ -1,101 +1,136 @@
-# Handover — argus M0: Scaffold & Tooling
+# Handover — argus M1: Inventory (read-only) + headless TUI über Attach-Stream
 
-Stand: 2026-06-11 · Branch `claude/dreamy-pasteur-6mq2va` · Status: **M0 fertig, alle Akzeptanzkriterien erfüllt**
+Stand: 2026-06-12 · Branch `claude/pensive-pascal-qg1bif` · Status: **M1 fertig, alle Akzeptanzkriterien erfüllt** (M0-Handover ersetzt)
 
 ## Was gebaut wurde
 
-Lauffähiges Skelett mit drei Binaries und Privilegien-Trennung:
+Beim Start von `argus` erscheint jetzt ein Live-Dashboard mit echten
+systemd-Services und Docker-Containern. Das TUI läuft headless **im Daemon**
+und wird über einen bidirektionalen gRPC-Attach-Stream an die Bridge geliefert.
+Alles read-only — keine Mutationen bis M4.
 
-- **`argusd`** (Daemon): lauscht per gRPC auf einem Unix Domain Socket
-  (Default `/run/argus/argusd.sock`), beantwortet den `Ping`-RPC, strukturiertes
-  `log/slog`-Logging, sauberes Shutdown bei SIGINT/SIGTERM (stale Socket wird
-  beim Start entfernt, beim Stop aufgeräumt, Socket-Mode 0660 für die Gruppe `argus`).
-- **`argus`** (Terminal-Bridge, unprivilegiert): verbindet sich über den Socket,
-  Ping→Pong, rendert den Argus-Splash. Bei Terminalbreite < 44 Spalten kompakte
-  Marke `◉ argus · v0.1.0`. Keine Logik außer gRPC + Rendering.
-- **`argus-mcp`**: leerer Entrypoint-Stub.
+- **Proto-Migration**: `Ping/Pong` → `PingRequest`/`PingResponse`; die in M0
+  deaktivierten buf-Naming-Regeln (`RPC_REQUEST_STANDARD_NAME` etc.) sind
+  wieder aktiv. Verbleibende Ausnahmen in `buf.yaml`: nur noch
+  `PACKAGE_DIRECTORY_MATCH` und `SERVICE_SUFFIX` (Layout/Servicename per Spec).
+- **`GetInventory`-RPC**: liefert Services + Container in einem Snapshot;
+  `container_error` trägt den Hinweis, wenn Docker nicht erreichbar ist
+  (Container-Liste dann leer, RPC trotzdem erfolgreich).
+- **`Attach`-RPC** (bidirektionaler Stream): Client→Daemon ein `oneof` aus
+  rohen stdin-Bytes und Resize-Events (cols/rows); Daemon→Client gerenderte
+  ANSI-Frames. Pro Attach-Call genau **eine ephemere Session** — kein
+  Detach/Reattach, keine Persistenz, keine Panes (M3).
+- **ServiceManager** (`internal/services`): Interface `Manager` + Impl
+  `SystemdManager` via `coreos/go-systemd/v22/dbus` (pure Go). Filtert auf
+  `*.service`, sortiert nach Name; pro `List`-Call frische dbus-Verbindung.
+- **ContainerManager** (`internal/containers`): Interface `Manager` + Impl
+  `DockerManager` via offizielles Docker-SDK (`client.FromEnv`, also
+  `DOCKER_HOST` / `/var/run/docker.sock`). `All: true`, führender `/` der
+  Namen wird gestrippt. Nicht erreichbarer Daemon → gewrappter Fehler, von
+  den Callern als nicht-fatal behandelt.
+- **Session** (`internal/session`): fährt ein headless Bubble-Tea-Programm.
+  Input über `io.Pipe` → `tea.WithInput`; Output direkt auf den Stream via
+  `tea.WithOutput`; Resize per `prog.Send(tea.WindowSizeMsg{...})`, weil der
+  Output ein Stream und kein TTY ist (SIGWINCH-Autodetect greift nicht).
+  `tea.WithAltScreen()` aktiv. `Close()` ist idempotent (Kill + Pipe zu).
+- **Dashboard** (`tui/dashboard.go`): zwei `bubbles/table`-Tabellen
+  (Services ⅔, Container ⅓ der Höhe), Statusfarben (active/running grün,
+  failed/exited rot, Rest gelb), Refresh alle 3 s via `tea.Tick`,
+  Fetch-Timeout 5 s, `q`/`ctrl+c`/`esc` beendet, `tab` wechselt Fokus
+  (Scrollen mit ↑/↓). Docker-Hinweis ersetzt die Container-Tabelle.
+- **Bridge** (`cmd/argus`): Raw-Mode via `x/term` (Restore auf jedem
+  Exit-Pfad + defensives `ESC[?1049l ESC[?25h` falls der Stream mitten in
+  der Session stirbt), initiale Größe + SIGWINCH-Resizes und stdin-Bytes
+  upstream, Frames nach stdout. Sends laufen durch einen Mutex-`sender`,
+  weil gRPC kein konkurrierendes `Send` erlaubt.
+- **`argus-mcp`**: unverändert leerer Stub (M7).
 
-## Repo-Struktur
+## Architektur-Entscheidung (verbindlich, auch im README)
+
+Das in-daemon TUI ruft die Modul-Interfaces (`services.Manager`,
+`containers.Manager`) **direkt in-process** auf — kein Self-gRPC. Die
+`GetInventory`-RPC wrappt dieselben Interfaces als externe API-Fläche
+(MCP/Hermes später). „Eine Integrationsfläche" gilt auf Ebene der
+Modul-Interfaces. Gemeinsamer Code: `Server.inventory()` in
+`internal/api/server.go`, genutzt vom RPC-Handler und als `tui.Fetch` der
+Dashboard-Session.
+
+## Repo-Struktur (Änderungen ggü. M0)
 
 ```
-argus/
-  cmd/argusd/           Daemon-Entrypoint (Flags, Signale, slog)
-  cmd/argus/            Bridge-Entrypoint (Dial, Ping, Splash)
-  cmd/argus-mcp/        leerer Stub
   internal/
-    daemon/daemon.go    Wiring: Socket-Lifecycle + gRPC-Server
-    api/server.go       gRPC-Serverimpl (Ping-Handler)
-    api/server_test.go  bufconn-Test für Ping
-    session/ services/ containers/ ports/ metrics/ logs/ store/ audit/
-                        leer (.gitkeep), für spätere Milestones reserviert
-  tui/banner.go         Splash (lipgloss) + Breiten-Fallback
-  proto/argus.proto     Service-Definition (Quelle der Wahrheit)
-  proto/argusv1/        generierter Code (eingecheckt)
-  deploy/argusd.service systemd-Unit (RuntimeDirectory=argus, Hardening)
-  deploy/install.sh     Gruppe argus, /run/argus (root:argus 0750), Unit-Install
-  buf.yaml, buf.gen.yaml, Makefile, .golangci.yml, .gitignore
+    api/server.go         Ping-, GetInventory-, Attach-Handler + inventory()
+    api/server_test.go    bufconn-Tests: Ping + GetInventory (gemockte Manager)
+    services/             Manager-Interface + SystemdManager + Tests
+    containers/           Manager-Interface + DockerManager + Tests
+    session/session.go    ephemere headless Bubble-Tea-Session
+    daemon/daemon.go      Wiring: Manager-Konstruktion, tui.ForceColors()
+  tui/
+    banner.go             Splash (bleibt) + ForceColors (ANSI-256-Pin)
+    dashboard.go          Dashboard-Model (Tabellen, Tick-Refresh, Farben)
+  cmd/argus/main.go       Raw-Mode-Bridge über den Attach-Stream
+  proto/argus.proto       Ping/GetInventory/Attach (Quelle der Wahrheit)
 ```
 
-## Make-Targets
-
-| Target | Zweck |
-|---|---|
-| `make build` | alle drei Binaries → `./bin` (Host-Plattform) |
-| `make cross` | statisch gelinktes linux/arm64 → `./bin/linux-arm64` (verifiziert: `file` → "ARM aarch64 … statically linked") |
-| `make test`  | Unit-Tests inkl. bufconn-gRPC-Test |
-| `make lint`  | gofumpt-Check + golangci-lint (v2-Config) |
-| `make proto` | `buf lint` + `buf generate` |
-| `make tools` | einmalig: buf v1.47.2, protoc-gen-go, protoc-gen-go-grpc v1.5.1, gofumpt |
-
-`CGO_ENABLED=0` ist im Makefile global exportiert; alle Dependencies sind pure Go
-(grpc, protobuf, lipgloss, x/term).
-
-## Lokaltest (ohne root)
+## Make-Targets (unverändert), Lokaltest
 
 ```sh
 ./bin/argusd --socket /tmp/argusd.sock     # Terminal 1
-./bin/argus  --socket /tmp/argusd.sock     # Terminal 2 → Splash
+./bin/argus  --socket /tmp/argusd.sock     # Terminal 2 → Dashboard, q beendet
 ```
 
-Socket-Pfad per `--socket`-Flag oder `ARGUS_SOCKET`-Env überschreibbar.
+`CGO_ENABLED=0` global; alle neuen Deps pure Go: go-systemd/v22 (godbus),
+docker/docker v28 (SDK), bubbletea v1.3, bubbles v1.0, lipgloss.
 
-## Entscheidungen & Stolpersteine (wichtig für M1)
+## Entscheidungen & Stolpersteine (wichtig für M2/M3)
 
-1. **Codegen via buf** (pure Go, kein protoc nötig). Config: `buf.yaml` +
-   `buf.gen.yaml` im Root, Output via `module=`-Option nach `proto/argusv1`.
-2. **Proto-Naming**: Die Spec verlangt `message Ping{}` + `rpc Ping`. Innerhalb
-   des `service`-Blocks löst der nackte Name `Ping` zur Methode auf — der
-   Request-Typ ist deshalb voll qualifiziert referenziert:
-   `rpc Ping(.argus.v1.Ping) returns (Pong)`. Die zugehörigen buf-Lint-Regeln
-   (RPC_REQUEST_STANDARD_NAME u.a.) sind in `buf.yaml` mit Begründung deaktiviert.
-   **Empfehlung für M1**: bei der nächsten Proto-Erweiterung auf
-   `PingRequest`/`PingResponse`-Konvention migrieren, solange es noch keine
-   externen Consumer gibt.
-3. **Tool-Versionen gepinnt**, weil `@latest` mit Go 1.24 bricht:
-   protoc-gen-go-grpc **v1.5.1** (v1.6.x braucht Go ≥ 1.25),
-   buf **v1.47.2**. Bei Go-Upgrade auf 1.25 kann beides angehoben werden.
-4. **golangci-lint v2-Configformat** (`version: "2"` in `.golangci.yml`);
-   aktiv u.a. errorlint, wrapcheck (alle Fehler werden gewrappt), revive.
-   Generierter Code (`proto/argusv1`) ist von Lint und Format ausgenommen.
-5. **Socket-Rechte**: Verzeichnis `/run/argus` root:argus 0750 (systemd
-   `RuntimeDirectory=` legt es bei jedem Start neu an), Socket 0660 — Clients
-   brauchen Mitgliedschaft in der Gruppe `argus` (`usermod -aG argus <user>`).
-6. **Terminalbreite** für den Splash-Fallback kommt aus `golang.org/x/term`
-   (pure Go); wenn stdout kein Terminal ist, wird der volle Splash gerendert.
+1. **Go auf 1.25 angehoben** (go.mod; das Docker-SDK zog den Toolchain-Bump).
+   Die in M0 gepinnten buf/protoc-gen-Versionen funktionieren weiter; mit
+   Go 1.25 könnten sie jetzt angehoben werden.
+2. **Headless-Farben**: termenv kann am Stream keine Terminal-Caps erkennen →
+   `tui.ForceColors()` pinnt das lipgloss-Profil auf ANSI 256 (Aufruf in
+   `daemon.Run`). M1-Annahme; M3 (virtuelles Terminal) kann das verfeinern.
+3. **`prog.Send` vor `Run` ist safe**: bubbletea v1.3 initialisiert msgs-Channel
+   und Context schon in `NewProgram` — Resize-Events, die vor dem Programmstart
+   eintreffen, blockieren nur kurz und gehen nicht verloren.
+4. **Attach-Lifecycle**: Recv-Loop läuft als Goroutine und killt die Session
+   bei Stream-Fehler; `tea.ErrProgramKilled` wird im Handler als normales
+   Disconnect-Ende behandelt (kein RPC-Fehler). Endet das Programm via „q",
+   schließt der Handler den Stream und die Bridge bekommt `io.EOF` → Exit 0.
+5. **Bridge-Sends serialisieren**: stdin-Goroutine und SIGWINCH-Goroutine
+   senden beide auf den Stream → Mutex-Wrapper `sender` in `cmd/argus`.
+6. **systemd-Fehler vs. Docker-Fehler**: systemd nicht erreichbar → RPC-Fehler
+   bzw. rote Fehlerzeile im Dashboard (Dashboard läuft weiter und retryt beim
+   nächsten Tick). Docker nicht erreichbar → nicht-fatal, Service-Liste
+   erscheint trotzdem + ⚠-Hinweis. Bewusste Asymmetrie: ohne systemd ist auf
+   der Zielplattform etwas grundlegend kaputt.
+7. **docker `Summary.State` ist `string`** (v28-SDK, nicht `ContainerState`) —
+   unconvert meckert sonst.
+8. **ctrl+c in Raw-Mode** erreicht die Bridge als Byte 0x03 und wird ans TUI
+   weitergeleitet (das darauf quittet); SIGINT/SIGTERM von außen canceln den
+   Stream-Context und räumen sauber auf.
 
 ## Verifikation (alles auf diesem Stand ausgeführt)
 
-- `make build` ✅ — drei Binaries
-- `make cross` ✅ — `file bin/linux-arm64/argusd` → „ELF 64-bit … ARM aarch64 … statically linked“
-- `make test` ✅ — inkl. `TestPing` gegen bufconn-In-Memory-Server
+- `make proto` ✅ — buf lint mit aktivierten Standard-Naming-Regeln
+- `make build` / `make cross` ✅ — `file` → „ARM aarch64 … statically linked"
+- `make test` ✅ — table-driven Tests für SystemdManager- und DockerManager-
+  Parsing gegen gemockte Backends (Filter, Sortierung, Slash-Strip,
+  Fehler-Wrapping) + bufconn-Tests für Ping und GetInventory (inkl.
+  Docker-down-mit-Hint und systemd-Fehler-als-RPC-Fehler)
 - `make lint` ✅ — 0 Issues, gofumpt clean
-- E2E ✅ — argusd auf `/tmp`-Socket gestartet, `argus` → Ping→Pong→Splash,
-  SIGTERM → graceful stop, Socket-Datei entfernt
+- E2E (Pseudo-TTY via `script`) ✅ — Attach rendert das Dashboard
+  (Alt-Screen, Tabellen-Header, Statusbar), „q" → Exit 0 + Terminal
+  restauriert; `kill -9` der Bridge mitten in der Session → Daemon läuft
+  weiter und akzeptiert weitere Attaches (drei Sessions nacheinander getestet)
+- ⚠ Sandbox hat kein systemd/Docker — der Live-Datenpfad zeigte hier korrekt
+  den Fehlerpfad; echte Daten bitte einmal auf dem Pi gegenchecken
 
-## Nächste Schritte (M1+, nicht begonnen)
+## Nächste Schritte (nicht begonnen)
 
-- Attach-Stream/Session: headless Bubble-Tea-Programm im Daemon, Key/Resize-Forwarding.
-- Befüllen von `internal/{session,services,containers,ports,metrics,logs,store,audit}`.
-- MCP-Logik in `cmd/argus-mcp`.
-- Optional: CI-Workflow (build/cross/lint/test), `-ldflags "-s -w"` für Release-Builds,
-  Version aus Git-Tag statt Konstante in `tui/banner.go`.
+- M2: Metriken + Logs.
+- M3: persistente/benannte Sessions, Detach/Reattach, Multi-Attach,
+  virtuelles Terminal mit Delta-Diffing, Panes — `internal/session` ist der
+  Ansatzpunkt, der Attach-Stream bleibt als Transport.
+- M4: start/stop/restart (erste Mutationen, dann Audit-Log).
+- Offen/optional: CI-Workflow, Release-ldflags, Version aus Git-Tag.

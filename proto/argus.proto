@@ -4,13 +4,71 @@ package argus.v1;
 
 option go_package = "github.com/jakobneri/argus/proto/argusv1";
 
-// Argus is the control-plane API of argusd. In M0 it only answers Ping.
+// Argus is the control-plane API of argusd.
 service Argus {
-  // Note: fully qualified, because inside the service block the bare name
-  // "Ping" resolves to the method itself, not the message.
-  rpc Ping(.argus.v1.Ping) returns (Pong);
+  // Ping answers a liveness probe.
+  rpc Ping(PingRequest) returns (PingResponse);
+
+  // GetInventory returns a read-only snapshot of systemd services and Docker
+  // containers. This RPC is the external API surface (e.g. for MCP consumers);
+  // the in-daemon TUI calls the module interfaces directly in-process.
+  rpc GetInventory(GetInventoryRequest) returns (GetInventoryResponse);
+
+  // Attach runs one ephemeral headless TUI session inside the daemon.
+  // Client -> daemon: raw stdin bytes and terminal resize events.
+  // Daemon -> client: rendered terminal frames (ANSI bytes).
+  // The session ends when the TUI program exits or the stream closes.
+  rpc Attach(stream AttachRequest) returns (stream AttachResponse);
 }
 
-message Ping {}
+message PingRequest {}
 
-message Pong {}
+message PingResponse {}
+
+message GetInventoryRequest {}
+
+message GetInventoryResponse {
+  repeated ServiceUnit services = 1;
+  repeated Container containers = 2;
+  // Non-fatal hint set when the Docker daemon is unreachable; containers is
+  // empty in that case.
+  string container_error = 3;
+}
+
+// ServiceUnit describes one systemd unit.
+message ServiceUnit {
+  string name = 1;
+  string description = 2;
+  string load_state = 3;
+  string active_state = 4;
+  string sub_state = 5;
+}
+
+// Container describes one Docker container.
+message Container {
+  string name = 1;
+  string image = 2;
+  string state = 3;
+  string status = 4;
+}
+
+message AttachRequest {
+  oneof event {
+    // Raw stdin bytes forwarded verbatim to the in-daemon TUI program.
+    bytes input = 1;
+    Resize resize = 2;
+  }
+}
+
+// Resize carries the client terminal dimensions. It must be sent once at the
+// start of the stream and again on every terminal resize, because the daemon
+// side renders to a stream (not a TTY) and cannot autodetect the size.
+message Resize {
+  uint32 cols = 1;
+  uint32 rows = 2;
+}
+
+message AttachResponse {
+  // Rendered terminal output (ANSI escape sequences included).
+  bytes output = 1;
+}
