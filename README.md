@@ -9,16 +9,26 @@ ARM64, generic Linux otherwise). Privilege-separated architecture:
 | `argus`     | Unprivileged terminal bridge. gRPC + rendering only — no logic.       |
 | `argus-mcp` | MCP bridge. Empty stub until M7.                                      |
 
-## Status: M1 — read-only inventory + headless TUI
+## Status: M2 — live metrics + streaming logs
 
-`argusd` listens on `/run/argus/argusd.sock` and serves three RPCs: `Ping`,
-`GetInventory` (snapshot of systemd services + Docker containers) and
-`Attach`, a bidirectional stream that hosts one ephemeral headless Bubble Tea
-dashboard per connection. `argus` puts the terminal into raw mode, attaches,
-forwards stdin bytes and resizes upstream and writes rendered frames to
-stdout; `q` quits. Everything is read-only — no mutations until M4. Metrics,
-logs, persistent sessions, detach/reattach, panes etc. come in later
-milestones.
+`argusd` listens on `/run/argus/argusd.sock` and serves five RPCs: `Ping`,
+`GetInventory` (snapshot of systemd services + Docker containers), `Attach`
+(a bidirectional stream that hosts one ephemeral headless Bubble Tea dashboard
+per connection), and two server-streaming RPCs added in M2:
+
+- `StreamMetrics` emits a host + per-container metrics snapshot on a fixed
+  interval (CPU %, RAM, disk and network for the host via gopsutil; CPU % and
+  memory per container via the Docker stats API).
+- `StreamLogs` streams unified log entries from the systemd journal
+  (`journalctl -o json --follow`) and/or Docker, with an optional unit /
+  container filter.
+
+`argus` puts the terminal into raw mode, attaches, forwards stdin bytes and
+resizes upstream and writes rendered frames to stdout. The dashboard now has a
+host metric row and a second tab (`tab` switches Dashboard ↔ Logs) showing a
+scrolling, filterable log view (`/` to filter by unit/container). `q` quits.
+Everything is read-only — no mutations until M4. Persistent sessions,
+detach/reattach, panes etc. come in later milestones.
 
 ## Building
 
@@ -67,6 +77,18 @@ the socket.
   the lipgloss color profile is pinned to ANSI 256 since terminal
   capabilities cannot be autodetected.
 - An unreachable Docker daemon is non-fatal: the service list still renders
-  and a hint is shown; `GetInventory` sets `container_error`.
+  and a hint is shown; `GetInventory` sets `container_error`. The same applies
+  to metrics (empty container list) and logs (that source is silently skipped).
+- **Reading the journal is exec-based, not CGO** (resolves the M1 open
+  question): the journald log source runs `journalctl -o json --follow` and
+  parses the JSON, instead of binding `libsystemd` via cgo. This keeps
+  `CGO_ENABLED=0` and a fully static ARM64 build. The follow process is bound
+  to the stream context (killed on client disconnect) and its stderr is logged,
+  never fatal. `argusd` runs privileged, so journalctl sees the full journal.
+- **Host metrics use gopsutil** (`cpu`, `mem`, `disk`, `net`), which is pure Go
+  on Linux. Each `Collect` is self-contained — host CPU is sampled over a short
+  window and container CPU is derived from two consecutive Docker stats frames —
+  so a single collector is safe to share between the in-daemon TUI and the
+  `StreamMetrics` RPC without cross-call state.
 - Socket permissions: directory 0750 root:argus, socket 0660 — the daemon is
   reachable only by root and the `argus` group.

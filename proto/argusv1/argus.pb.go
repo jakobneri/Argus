@@ -21,6 +21,60 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// LogSource selects which backends a log stream draws from.
+type LogSource int32
+
+const (
+	// Unspecified is treated as ALL.
+	LogSource_LOG_SOURCE_UNSPECIFIED LogSource = 0
+	LogSource_LOG_SOURCE_ALL         LogSource = 1
+	LogSource_LOG_SOURCE_SYSTEMD     LogSource = 2
+	LogSource_LOG_SOURCE_DOCKER      LogSource = 3
+)
+
+// Enum value maps for LogSource.
+var (
+	LogSource_name = map[int32]string{
+		0: "LOG_SOURCE_UNSPECIFIED",
+		1: "LOG_SOURCE_ALL",
+		2: "LOG_SOURCE_SYSTEMD",
+		3: "LOG_SOURCE_DOCKER",
+	}
+	LogSource_value = map[string]int32{
+		"LOG_SOURCE_UNSPECIFIED": 0,
+		"LOG_SOURCE_ALL":         1,
+		"LOG_SOURCE_SYSTEMD":     2,
+		"LOG_SOURCE_DOCKER":      3,
+	}
+)
+
+func (x LogSource) Enum() *LogSource {
+	p := new(LogSource)
+	*p = x
+	return p
+}
+
+func (x LogSource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LogSource) Descriptor() protoreflect.EnumDescriptor {
+	return file_argus_proto_enumTypes[0].Descriptor()
+}
+
+func (LogSource) Type() protoreflect.EnumType {
+	return &file_argus_proto_enumTypes[0]
+}
+
+func (x LogSource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LogSource.Descriptor instead.
+func (LogSource) EnumDescriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{0}
+}
+
 type PingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -520,6 +574,521 @@ func (x *AttachResponse) GetOutput() []byte {
 	return nil
 }
 
+type StreamMetricsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// How often the server emits a snapshot. Zero means the server default (3s).
+	IntervalSeconds uint32 `protobuf:"varint,1,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *StreamMetricsRequest) Reset() {
+	*x = StreamMetricsRequest{}
+	mi := &file_argus_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamMetricsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamMetricsRequest) ProtoMessage() {}
+
+func (x *StreamMetricsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamMetricsRequest.ProtoReflect.Descriptor instead.
+func (*StreamMetricsRequest) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *StreamMetricsRequest) GetIntervalSeconds() uint32 {
+	if x != nil {
+		return x.IntervalSeconds
+	}
+	return 0
+}
+
+type StreamMetricsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Snapshot      *MetricsSnapshot       `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamMetricsResponse) Reset() {
+	*x = StreamMetricsResponse{}
+	mi := &file_argus_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamMetricsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamMetricsResponse) ProtoMessage() {}
+
+func (x *StreamMetricsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamMetricsResponse.ProtoReflect.Descriptor instead.
+func (*StreamMetricsResponse) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *StreamMetricsResponse) GetSnapshot() *MetricsSnapshot {
+	if x != nil {
+		return x.Snapshot
+	}
+	return nil
+}
+
+// MetricsSnapshot is one point-in-time reading of host and container metrics.
+type MetricsSnapshot struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Wall-clock time the snapshot was taken, as Unix nanoseconds.
+	TimestampUnixNano int64               `protobuf:"varint,1,opt,name=timestamp_unix_nano,json=timestampUnixNano,proto3" json:"timestamp_unix_nano,omitempty"`
+	Host              *HostMetrics        `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	Containers        []*ContainerMetrics `protobuf:"bytes,3,rep,name=containers,proto3" json:"containers,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *MetricsSnapshot) Reset() {
+	*x = MetricsSnapshot{}
+	mi := &file_argus_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MetricsSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MetricsSnapshot) ProtoMessage() {}
+
+func (x *MetricsSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MetricsSnapshot.ProtoReflect.Descriptor instead.
+func (*MetricsSnapshot) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *MetricsSnapshot) GetTimestampUnixNano() int64 {
+	if x != nil {
+		return x.TimestampUnixNano
+	}
+	return 0
+}
+
+func (x *MetricsSnapshot) GetHost() *HostMetrics {
+	if x != nil {
+		return x.Host
+	}
+	return nil
+}
+
+func (x *MetricsSnapshot) GetContainers() []*ContainerMetrics {
+	if x != nil {
+		return x.Containers
+	}
+	return nil
+}
+
+// HostMetrics holds the whole-host resource usage.
+type HostMetrics struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Busy CPU across all cores, 0..100.
+	CpuPercent     float64 `protobuf:"fixed64,1,opt,name=cpu_percent,json=cpuPercent,proto3" json:"cpu_percent,omitempty"`
+	MemUsedBytes   uint64  `protobuf:"varint,2,opt,name=mem_used_bytes,json=memUsedBytes,proto3" json:"mem_used_bytes,omitempty"`
+	MemTotalBytes  uint64  `protobuf:"varint,3,opt,name=mem_total_bytes,json=memTotalBytes,proto3" json:"mem_total_bytes,omitempty"`
+	DiskUsedBytes  uint64  `protobuf:"varint,4,opt,name=disk_used_bytes,json=diskUsedBytes,proto3" json:"disk_used_bytes,omitempty"`
+	DiskTotalBytes uint64  `protobuf:"varint,5,opt,name=disk_total_bytes,json=diskTotalBytes,proto3" json:"disk_total_bytes,omitempty"`
+	// Mount point the disk figures refer to (the main mount, "/").
+	DiskMount string `protobuf:"bytes,6,opt,name=disk_mount,json=diskMount,proto3" json:"disk_mount,omitempty"`
+	// Cumulative network bytes received / transmitted since boot.
+	NetRxBytes    uint64 `protobuf:"varint,7,opt,name=net_rx_bytes,json=netRxBytes,proto3" json:"net_rx_bytes,omitempty"`
+	NetTxBytes    uint64 `protobuf:"varint,8,opt,name=net_tx_bytes,json=netTxBytes,proto3" json:"net_tx_bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HostMetrics) Reset() {
+	*x = HostMetrics{}
+	mi := &file_argus_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HostMetrics) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HostMetrics) ProtoMessage() {}
+
+func (x *HostMetrics) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HostMetrics.ProtoReflect.Descriptor instead.
+func (*HostMetrics) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *HostMetrics) GetCpuPercent() float64 {
+	if x != nil {
+		return x.CpuPercent
+	}
+	return 0
+}
+
+func (x *HostMetrics) GetMemUsedBytes() uint64 {
+	if x != nil {
+		return x.MemUsedBytes
+	}
+	return 0
+}
+
+func (x *HostMetrics) GetMemTotalBytes() uint64 {
+	if x != nil {
+		return x.MemTotalBytes
+	}
+	return 0
+}
+
+func (x *HostMetrics) GetDiskUsedBytes() uint64 {
+	if x != nil {
+		return x.DiskUsedBytes
+	}
+	return 0
+}
+
+func (x *HostMetrics) GetDiskTotalBytes() uint64 {
+	if x != nil {
+		return x.DiskTotalBytes
+	}
+	return 0
+}
+
+func (x *HostMetrics) GetDiskMount() string {
+	if x != nil {
+		return x.DiskMount
+	}
+	return ""
+}
+
+func (x *HostMetrics) GetNetRxBytes() uint64 {
+	if x != nil {
+		return x.NetRxBytes
+	}
+	return 0
+}
+
+func (x *HostMetrics) GetNetTxBytes() uint64 {
+	if x != nil {
+		return x.NetTxBytes
+	}
+	return 0
+}
+
+// ContainerMetrics holds the resource usage of one running container.
+type ContainerMetrics struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// CPU usage normalised to the number of online CPUs, 0..100*ncpu.
+	CpuPercent   float64 `protobuf:"fixed64,2,opt,name=cpu_percent,json=cpuPercent,proto3" json:"cpu_percent,omitempty"`
+	MemUsedBytes uint64  `protobuf:"varint,3,opt,name=mem_used_bytes,json=memUsedBytes,proto3" json:"mem_used_bytes,omitempty"`
+	// Memory limit; zero when the container is unconstrained.
+	MemLimitBytes uint64 `protobuf:"varint,4,opt,name=mem_limit_bytes,json=memLimitBytes,proto3" json:"mem_limit_bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContainerMetrics) Reset() {
+	*x = ContainerMetrics{}
+	mi := &file_argus_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContainerMetrics) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContainerMetrics) ProtoMessage() {}
+
+func (x *ContainerMetrics) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContainerMetrics.ProtoReflect.Descriptor instead.
+func (*ContainerMetrics) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ContainerMetrics) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ContainerMetrics) GetCpuPercent() float64 {
+	if x != nil {
+		return x.CpuPercent
+	}
+	return 0
+}
+
+func (x *ContainerMetrics) GetMemUsedBytes() uint64 {
+	if x != nil {
+		return x.MemUsedBytes
+	}
+	return 0
+}
+
+func (x *ContainerMetrics) GetMemLimitBytes() uint64 {
+	if x != nil {
+		return x.MemLimitBytes
+	}
+	return 0
+}
+
+type StreamLogsRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Source LogSource              `protobuf:"varint,1,opt,name=source,proto3,enum=argus.v1.LogSource" json:"source,omitempty"`
+	// Optional filter: a systemd unit name and/or a Docker container name. Empty
+	// means no filter (all units / all running containers for the chosen source).
+	Filter string `protobuf:"bytes,2,opt,name=filter,proto3" json:"filter,omitempty"`
+	// Optional start point passed through to the backends (e.g. "-1h" or an
+	// absolute "2026-06-15 10:00:00"). Empty means the backend default.
+	Since         string `protobuf:"bytes,3,opt,name=since,proto3" json:"since,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamLogsRequest) Reset() {
+	*x = StreamLogsRequest{}
+	mi := &file_argus_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamLogsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamLogsRequest) ProtoMessage() {}
+
+func (x *StreamLogsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamLogsRequest.ProtoReflect.Descriptor instead.
+func (*StreamLogsRequest) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *StreamLogsRequest) GetSource() LogSource {
+	if x != nil {
+		return x.Source
+	}
+	return LogSource_LOG_SOURCE_UNSPECIFIED
+}
+
+func (x *StreamLogsRequest) GetFilter() string {
+	if x != nil {
+		return x.Filter
+	}
+	return ""
+}
+
+func (x *StreamLogsRequest) GetSince() string {
+	if x != nil {
+		return x.Since
+	}
+	return ""
+}
+
+type StreamLogsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entry         *LogEntry              `protobuf:"bytes,1,opt,name=entry,proto3" json:"entry,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamLogsResponse) Reset() {
+	*x = StreamLogsResponse{}
+	mi := &file_argus_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamLogsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamLogsResponse) ProtoMessage() {}
+
+func (x *StreamLogsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamLogsResponse.ProtoReflect.Descriptor instead.
+func (*StreamLogsResponse) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *StreamLogsResponse) GetEntry() *LogEntry {
+	if x != nil {
+		return x.Entry
+	}
+	return nil
+}
+
+// LogEntry is one unified log line from either backend.
+type LogEntry struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Time the entry was logged, as Unix nanoseconds.
+	TimestampUnixNano int64     `protobuf:"varint,1,opt,name=timestamp_unix_nano,json=timestampUnixNano,proto3" json:"timestamp_unix_nano,omitempty"`
+	Source            LogSource `protobuf:"varint,2,opt,name=source,proto3,enum=argus.v1.LogSource" json:"source,omitempty"`
+	// The systemd unit or Docker container the entry came from.
+	Origin string `protobuf:"bytes,3,opt,name=origin,proto3" json:"origin,omitempty"`
+	// Severity ("info", "err", ...) for journald; the stream ("stdout"/"stderr")
+	// for Docker.
+	Level         string `protobuf:"bytes,4,opt,name=level,proto3" json:"level,omitempty"`
+	Message       string `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogEntry) Reset() {
+	*x = LogEntry{}
+	mi := &file_argus_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogEntry) ProtoMessage() {}
+
+func (x *LogEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_argus_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogEntry.ProtoReflect.Descriptor instead.
+func (*LogEntry) Descriptor() ([]byte, []int) {
+	return file_argus_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *LogEntry) GetTimestampUnixNano() int64 {
+	if x != nil {
+		return x.TimestampUnixNano
+	}
+	return 0
+}
+
+func (x *LogEntry) GetSource() LogSource {
+	if x != nil {
+		return x.Source
+	}
+	return LogSource_LOG_SOURCE_UNSPECIFIED
+}
+
+func (x *LogEntry) GetOrigin() string {
+	if x != nil {
+		return x.Origin
+	}
+	return ""
+}
+
+func (x *LogEntry) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *LogEntry) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_argus_proto protoreflect.FileDescriptor
 
 const file_argus_proto_rawDesc = "" +
@@ -554,11 +1123,60 @@ const file_argus_proto_rawDesc = "" +
 	"\x04cols\x18\x01 \x01(\rR\x04cols\x12\x12\n" +
 	"\x04rows\x18\x02 \x01(\rR\x04rows\"(\n" +
 	"\x0eAttachResponse\x12\x16\n" +
-	"\x06output\x18\x01 \x01(\fR\x06output2\xce\x01\n" +
+	"\x06output\x18\x01 \x01(\fR\x06output\"A\n" +
+	"\x14StreamMetricsRequest\x12)\n" +
+	"\x10interval_seconds\x18\x01 \x01(\rR\x0fintervalSeconds\"N\n" +
+	"\x15StreamMetricsResponse\x125\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\x19.argus.v1.MetricsSnapshotR\bsnapshot\"\xa8\x01\n" +
+	"\x0fMetricsSnapshot\x12.\n" +
+	"\x13timestamp_unix_nano\x18\x01 \x01(\x03R\x11timestampUnixNano\x12)\n" +
+	"\x04host\x18\x02 \x01(\v2\x15.argus.v1.HostMetricsR\x04host\x12:\n" +
+	"\n" +
+	"containers\x18\x03 \x03(\v2\x1a.argus.v1.ContainerMetricsR\n" +
+	"containers\"\xb1\x02\n" +
+	"\vHostMetrics\x12\x1f\n" +
+	"\vcpu_percent\x18\x01 \x01(\x01R\n" +
+	"cpuPercent\x12$\n" +
+	"\x0emem_used_bytes\x18\x02 \x01(\x04R\fmemUsedBytes\x12&\n" +
+	"\x0fmem_total_bytes\x18\x03 \x01(\x04R\rmemTotalBytes\x12&\n" +
+	"\x0fdisk_used_bytes\x18\x04 \x01(\x04R\rdiskUsedBytes\x12(\n" +
+	"\x10disk_total_bytes\x18\x05 \x01(\x04R\x0ediskTotalBytes\x12\x1d\n" +
+	"\n" +
+	"disk_mount\x18\x06 \x01(\tR\tdiskMount\x12 \n" +
+	"\fnet_rx_bytes\x18\a \x01(\x04R\n" +
+	"netRxBytes\x12 \n" +
+	"\fnet_tx_bytes\x18\b \x01(\x04R\n" +
+	"netTxBytes\"\x95\x01\n" +
+	"\x10ContainerMetrics\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
+	"\vcpu_percent\x18\x02 \x01(\x01R\n" +
+	"cpuPercent\x12$\n" +
+	"\x0emem_used_bytes\x18\x03 \x01(\x04R\fmemUsedBytes\x12&\n" +
+	"\x0fmem_limit_bytes\x18\x04 \x01(\x04R\rmemLimitBytes\"n\n" +
+	"\x11StreamLogsRequest\x12+\n" +
+	"\x06source\x18\x01 \x01(\x0e2\x13.argus.v1.LogSourceR\x06source\x12\x16\n" +
+	"\x06filter\x18\x02 \x01(\tR\x06filter\x12\x14\n" +
+	"\x05since\x18\x03 \x01(\tR\x05since\">\n" +
+	"\x12StreamLogsResponse\x12(\n" +
+	"\x05entry\x18\x01 \x01(\v2\x12.argus.v1.LogEntryR\x05entry\"\xaf\x01\n" +
+	"\bLogEntry\x12.\n" +
+	"\x13timestamp_unix_nano\x18\x01 \x01(\x03R\x11timestampUnixNano\x12+\n" +
+	"\x06source\x18\x02 \x01(\x0e2\x13.argus.v1.LogSourceR\x06source\x12\x16\n" +
+	"\x06origin\x18\x03 \x01(\tR\x06origin\x12\x14\n" +
+	"\x05level\x18\x04 \x01(\tR\x05level\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage*j\n" +
+	"\tLogSource\x12\x1a\n" +
+	"\x16LOG_SOURCE_UNSPECIFIED\x10\x00\x12\x12\n" +
+	"\x0eLOG_SOURCE_ALL\x10\x01\x12\x16\n" +
+	"\x12LOG_SOURCE_SYSTEMD\x10\x02\x12\x15\n" +
+	"\x11LOG_SOURCE_DOCKER\x10\x032\xed\x02\n" +
 	"\x05Argus\x125\n" +
 	"\x04Ping\x12\x15.argus.v1.PingRequest\x1a\x16.argus.v1.PingResponse\x12M\n" +
 	"\fGetInventory\x12\x1d.argus.v1.GetInventoryRequest\x1a\x1e.argus.v1.GetInventoryResponse\x12?\n" +
-	"\x06Attach\x12\x17.argus.v1.AttachRequest\x1a\x18.argus.v1.AttachResponse(\x010\x01B*Z(github.com/jakobneri/argus/proto/argusv1b\x06proto3"
+	"\x06Attach\x12\x17.argus.v1.AttachRequest\x1a\x18.argus.v1.AttachResponse(\x010\x01\x12R\n" +
+	"\rStreamMetrics\x12\x1e.argus.v1.StreamMetricsRequest\x1a\x1f.argus.v1.StreamMetricsResponse0\x01\x12I\n" +
+	"\n" +
+	"StreamLogs\x12\x1b.argus.v1.StreamLogsRequest\x1a\x1c.argus.v1.StreamLogsResponse0\x01B*Z(github.com/jakobneri/argus/proto/argusv1b\x06proto3"
 
 var (
 	file_argus_proto_rawDescOnce sync.Once
@@ -572,33 +1190,53 @@ func file_argus_proto_rawDescGZIP() []byte {
 	return file_argus_proto_rawDescData
 }
 
-var file_argus_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_argus_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_argus_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_argus_proto_goTypes = []any{
-	(*PingRequest)(nil),          // 0: argus.v1.PingRequest
-	(*PingResponse)(nil),         // 1: argus.v1.PingResponse
-	(*GetInventoryRequest)(nil),  // 2: argus.v1.GetInventoryRequest
-	(*GetInventoryResponse)(nil), // 3: argus.v1.GetInventoryResponse
-	(*ServiceUnit)(nil),          // 4: argus.v1.ServiceUnit
-	(*Container)(nil),            // 5: argus.v1.Container
-	(*AttachRequest)(nil),        // 6: argus.v1.AttachRequest
-	(*Resize)(nil),               // 7: argus.v1.Resize
-	(*AttachResponse)(nil),       // 8: argus.v1.AttachResponse
+	(LogSource)(0),                // 0: argus.v1.LogSource
+	(*PingRequest)(nil),           // 1: argus.v1.PingRequest
+	(*PingResponse)(nil),          // 2: argus.v1.PingResponse
+	(*GetInventoryRequest)(nil),   // 3: argus.v1.GetInventoryRequest
+	(*GetInventoryResponse)(nil),  // 4: argus.v1.GetInventoryResponse
+	(*ServiceUnit)(nil),           // 5: argus.v1.ServiceUnit
+	(*Container)(nil),             // 6: argus.v1.Container
+	(*AttachRequest)(nil),         // 7: argus.v1.AttachRequest
+	(*Resize)(nil),                // 8: argus.v1.Resize
+	(*AttachResponse)(nil),        // 9: argus.v1.AttachResponse
+	(*StreamMetricsRequest)(nil),  // 10: argus.v1.StreamMetricsRequest
+	(*StreamMetricsResponse)(nil), // 11: argus.v1.StreamMetricsResponse
+	(*MetricsSnapshot)(nil),       // 12: argus.v1.MetricsSnapshot
+	(*HostMetrics)(nil),           // 13: argus.v1.HostMetrics
+	(*ContainerMetrics)(nil),      // 14: argus.v1.ContainerMetrics
+	(*StreamLogsRequest)(nil),     // 15: argus.v1.StreamLogsRequest
+	(*StreamLogsResponse)(nil),    // 16: argus.v1.StreamLogsResponse
+	(*LogEntry)(nil),              // 17: argus.v1.LogEntry
 }
 var file_argus_proto_depIdxs = []int32{
-	4, // 0: argus.v1.GetInventoryResponse.services:type_name -> argus.v1.ServiceUnit
-	5, // 1: argus.v1.GetInventoryResponse.containers:type_name -> argus.v1.Container
-	7, // 2: argus.v1.AttachRequest.resize:type_name -> argus.v1.Resize
-	0, // 3: argus.v1.Argus.Ping:input_type -> argus.v1.PingRequest
-	2, // 4: argus.v1.Argus.GetInventory:input_type -> argus.v1.GetInventoryRequest
-	6, // 5: argus.v1.Argus.Attach:input_type -> argus.v1.AttachRequest
-	1, // 6: argus.v1.Argus.Ping:output_type -> argus.v1.PingResponse
-	3, // 7: argus.v1.Argus.GetInventory:output_type -> argus.v1.GetInventoryResponse
-	8, // 8: argus.v1.Argus.Attach:output_type -> argus.v1.AttachResponse
-	6, // [6:9] is the sub-list for method output_type
-	3, // [3:6] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	5,  // 0: argus.v1.GetInventoryResponse.services:type_name -> argus.v1.ServiceUnit
+	6,  // 1: argus.v1.GetInventoryResponse.containers:type_name -> argus.v1.Container
+	8,  // 2: argus.v1.AttachRequest.resize:type_name -> argus.v1.Resize
+	12, // 3: argus.v1.StreamMetricsResponse.snapshot:type_name -> argus.v1.MetricsSnapshot
+	13, // 4: argus.v1.MetricsSnapshot.host:type_name -> argus.v1.HostMetrics
+	14, // 5: argus.v1.MetricsSnapshot.containers:type_name -> argus.v1.ContainerMetrics
+	0,  // 6: argus.v1.StreamLogsRequest.source:type_name -> argus.v1.LogSource
+	17, // 7: argus.v1.StreamLogsResponse.entry:type_name -> argus.v1.LogEntry
+	0,  // 8: argus.v1.LogEntry.source:type_name -> argus.v1.LogSource
+	1,  // 9: argus.v1.Argus.Ping:input_type -> argus.v1.PingRequest
+	3,  // 10: argus.v1.Argus.GetInventory:input_type -> argus.v1.GetInventoryRequest
+	7,  // 11: argus.v1.Argus.Attach:input_type -> argus.v1.AttachRequest
+	10, // 12: argus.v1.Argus.StreamMetrics:input_type -> argus.v1.StreamMetricsRequest
+	15, // 13: argus.v1.Argus.StreamLogs:input_type -> argus.v1.StreamLogsRequest
+	2,  // 14: argus.v1.Argus.Ping:output_type -> argus.v1.PingResponse
+	4,  // 15: argus.v1.Argus.GetInventory:output_type -> argus.v1.GetInventoryResponse
+	9,  // 16: argus.v1.Argus.Attach:output_type -> argus.v1.AttachResponse
+	11, // 17: argus.v1.Argus.StreamMetrics:output_type -> argus.v1.StreamMetricsResponse
+	16, // 18: argus.v1.Argus.StreamLogs:output_type -> argus.v1.StreamLogsResponse
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_argus_proto_init() }
@@ -615,13 +1253,14 @@ func file_argus_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_argus_proto_rawDesc), len(file_argus_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   9,
+			NumEnums:      1,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_argus_proto_goTypes,
 		DependencyIndexes: file_argus_proto_depIdxs,
+		EnumInfos:         file_argus_proto_enumTypes,
 		MessageInfos:      file_argus_proto_msgTypes,
 	}.Build()
 	File_argus_proto = out.File

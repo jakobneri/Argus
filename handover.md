@@ -1,136 +1,123 @@
-# Handover — argus M1: Inventory (read-only) + headless TUI über Attach-Stream
+# Handover — argus M2: Live-Metriken + streamende Logs
 
-Stand: 2026-06-12 · Branch `claude/pensive-pascal-qg1bif` · Status: **M1 fertig, alle Akzeptanzkriterien erfüllt** (M0-Handover ersetzt)
+Stand: 2026-06-15 · Branch `claude/charming-maxwell-8vywr5` · Status: **M2 fertig,
+alle Akzeptanzkriterien außer dem Pi-E2E erfüllt** (M1-Handover ersetzt)
+
+## Doku-Hinweis (wichtig)
+Die im Task referenzierten `ARCHITECTURE.md`, `CONVENTIONS.md`, `ROADMAP.md`
+existieren im Repo **nicht**. Quelle der Wahrheit sind weiterhin `README.md`
+(Architektur-Entscheidungen) und diese `handover.md`. Die geforderte Auflösung
+der journald-CGO-Frage ist daher in `README.md` unter „Assumptions / decisions"
+dokumentiert (statt in einer nicht vorhandenen `ARCHITECTURE.md`).
 
 ## Was gebaut wurde
 
-Beim Start von `argus` erscheint jetzt ein Live-Dashboard mit echten
-systemd-Services und Docker-Containern. Das TUI läuft headless **im Daemon**
-und wird über einen bidirektionalen gRPC-Attach-Stream an die Bridge geliefert.
-Alles read-only — keine Mutationen bis M4.
+Das Dashboard zeigt jetzt eine **Host-Metrik-Zeile** (CPU/RAM/Disk/Net) und hat
+einen zweiten Tab **Logs** (scrollende, filterbare Liste). Zwei neue
+Server-Streaming-RPCs liefern dieselben Daten als externe API-Fläche. Alles
+read-only — keine Mutationen bis M4.
 
-- **Proto-Migration**: `Ping/Pong` → `PingRequest`/`PingResponse`; die in M0
-  deaktivierten buf-Naming-Regeln (`RPC_REQUEST_STANDARD_NAME` etc.) sind
-  wieder aktiv. Verbleibende Ausnahmen in `buf.yaml`: nur noch
-  `PACKAGE_DIRECTORY_MATCH` und `SERVICE_SUFFIX` (Layout/Servicename per Spec).
-- **`GetInventory`-RPC**: liefert Services + Container in einem Snapshot;
-  `container_error` trägt den Hinweis, wenn Docker nicht erreichbar ist
-  (Container-Liste dann leer, RPC trotzdem erfolgreich).
-- **`Attach`-RPC** (bidirektionaler Stream): Client→Daemon ein `oneof` aus
-  rohen stdin-Bytes und Resize-Events (cols/rows); Daemon→Client gerenderte
-  ANSI-Frames. Pro Attach-Call genau **eine ephemere Session** — kein
-  Detach/Reattach, keine Persistenz, keine Panes (M3).
-- **ServiceManager** (`internal/services`): Interface `Manager` + Impl
-  `SystemdManager` via `coreos/go-systemd/v22/dbus` (pure Go). Filtert auf
-  `*.service`, sortiert nach Name; pro `List`-Call frische dbus-Verbindung.
-- **ContainerManager** (`internal/containers`): Interface `Manager` + Impl
-  `DockerManager` via offizielles Docker-SDK (`client.FromEnv`, also
-  `DOCKER_HOST` / `/var/run/docker.sock`). `All: true`, führender `/` der
-  Namen wird gestrippt. Nicht erreichbarer Daemon → gewrappter Fehler, von
-  den Callern als nicht-fatal behandelt.
-- **Session** (`internal/session`): fährt ein headless Bubble-Tea-Programm.
-  Input über `io.Pipe` → `tea.WithInput`; Output direkt auf den Stream via
-  `tea.WithOutput`; Resize per `prog.Send(tea.WindowSizeMsg{...})`, weil der
-  Output ein Stream und kein TTY ist (SIGWINCH-Autodetect greift nicht).
-  `tea.WithAltScreen()` aktiv. `Close()` ist idempotent (Kill + Pipe zu).
-- **Dashboard** (`tui/dashboard.go`): zwei `bubbles/table`-Tabellen
-  (Services ⅔, Container ⅓ der Höhe), Statusfarben (active/running grün,
-  failed/exited rot, Rest gelb), Refresh alle 3 s via `tea.Tick`,
-  Fetch-Timeout 5 s, `q`/`ctrl+c`/`esc` beendet, `tab` wechselt Fokus
-  (Scrollen mit ↑/↓). Docker-Hinweis ersetzt die Container-Tabelle.
-- **Bridge** (`cmd/argus`): Raw-Mode via `x/term` (Restore auf jedem
-  Exit-Pfad + defensives `ESC[?1049l ESC[?25h` falls der Stream mitten in
-  der Session stirbt), initiale Größe + SIGWINCH-Resizes und stdin-Bytes
-  upstream, Frames nach stdout. Sends laufen durch einen Mutex-`sender`,
-  weil gRPC kein konkurrierendes `Send` erlaubt.
-- **`argus-mcp`**: unverändert leerer Stub (M7).
+- **Proto** (`proto/argus.proto`): zwei neue RPCs
+  `StreamMetrics(StreamMetricsRequest) returns (stream StreamMetricsResponse)`
+  und `StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse)`.
+  - **Naming-Hinweis (verbindlich):** Die in M1 reaktivierten buf-Regeln
+    `RPC_REQUEST_STANDARD_NAME`/`RPC_RESPONSE_STANDARD_NAME` verlangen
+    `<Rpc>Request`/`<Rpc>Response`. Die im Task genannten Domänentypen
+    `MetricsSnapshot` und `LogEntry` bleiben erhalten, indem die Responses sie
+    dünn umhüllen (`StreamMetricsResponse{ MetricsSnapshot snapshot }`,
+    `StreamLogsResponse{ LogEntry entry }`). So bleibt `buf lint` grün **ohne**
+    die M1-Regeln wieder aufzuweichen. Messages: `MetricsSnapshot`,
+    `HostMetrics`, `ContainerMetrics`, `LogEntry`, Enum `LogSource`
+    (UNSPECIFIED=ALL, SYSTEMD, DOCKER).
+- **MetricsCollector** (`internal/metrics/`): Interface `Collector` + Impl.
+  Host via gopsutil (`cpu`/`mem`/`disk`/`net`, pure Go); pro Container CPU% +
+  Mem via Docker Stats-API. Backends (`hostSource`, `containerSource`) sind
+  Interfaces → in Tests gemockt. CPU%-Formel (`docker stats`-Formel) und
+  Mem-Working-Set (Cache-Abzug, cgroup v1/v2) sind reine, getestete Funktionen.
+- **LogStreamer** (`internal/logs/`): Interface `Manager` + Impl, die journald-
+  und Docker-Quelle in einen Kanal mergt und über `emit` ausliefert (ein
+  Consumer-Goroutine → emit nie nebenläufig, gRPC-Send safe).
+  - `journald.go`: `journalctl --output=json --follow --no-pager` via
+    `exec.CommandContext` (Kill bei ctx.Done), stderr wird geloggt nicht fatal.
+    Parser `parseJournalLine` (String- **und** Byte-Array-MESSAGE,
+    `__REALTIME_TIMESTAMP`→`time`, PRIORITY→Name, Unit/Syslog-Fallback).
+  - `docker.go`: `ContainerLogs(Follow)` je laufendem Container; TTY-Erkennung
+    via `ContainerInspect`; 8-Byte-Multiplex-Demux mit Teilzeilen-Puffer;
+    RFC3339Nano-Timestamp-Parse; Level = stdout/stderr.
+- **API-Server** (`internal/api/`): `StreamMetrics`- + `StreamLogs`-Handler;
+  Mapping in `convert.go` (Snapshot/Entry → Proto **und** → TUI-View-Typen). Die
+  In-Process-Adapter `metricsFetch`/`logStream` füttern das in-daemon-TUI
+  (gleiche Module wie die RPCs — kein Self-gRPC).
+- **Daemon** (`internal/daemon/daemon.go`): `metrics.NewCollector()` +
+  `logs.NewManager(log)` injiziert.
+- **TUI**: `tui/metrics.go` (View-Typen + Metrik-Bar + Byte-Formatter),
+  `tui/logs.go` (viewport + textinput, Generations-getaggter Stream, `/` Filter,
+  `1/2/3` Quelle), `tui/dashboard.go` ist jetzt das Tab-Root-Model.
+  Navigation: **`tab`** wechselt Dashboard↔Logs, **`shift+tab`** togglet den
+  Pane-Fokus (Services/Container) im Dashboard, `q`/`ctrl+c`/`esc` beenden
+  (im Filter-Eingabemodus tippt `q` in das Feld; nur `ctrl+c` beendet hart).
 
-## Architektur-Entscheidung (verbindlich, auch im README)
+## Architektur-Entscheidungen (verbindlich)
 
-Das in-daemon TUI ruft die Modul-Interfaces (`services.Manager`,
-`containers.Manager`) **direkt in-process** auf — kein Self-gRPC. Die
-`GetInventory`-RPC wrappt dieselben Interfaces als externe API-Fläche
-(MCP/Hermes später). „Eine Integrationsfläche" gilt auf Ebene der
-Modul-Interfaces. Gemeinsamer Code: `Server.inventory()` in
-`internal/api/server.go`, genutzt vom RPC-Handler und als `tui.Fetch` der
-Dashboard-Session.
+1. **journald exec-basiert, kein CGO.** Auflösung der M1-offenen Frage:
+   `journalctl -o json --follow` + JSON-Parser. `CGO_ENABLED=0` bleibt,
+   `make cross` (ARM64) bleibt statisch. Prozess-Lifecycle an Stream-Context.
+2. **Self-contained Collect statt geteiltem Vorgänger-State.** Der Task schlug
+   „previousCPU aus letztem Snapshot merken" vor. Stattdessen ist jeder
+   `Collect` in sich abgeschlossen: Host-CPU wird über ein kurzes Fenster
+   gesampelt (`cpu.Percent(window)`), Container-CPU aus **zwei** aufeinander
+   folgenden Docker-Stats-Frames (Frame 2 trägt gültige `PreCPUStats`)
+   berechnet. Grund: derselbe Collector wird vom In-Process-TUI **und** der
+   `StreamMetrics`-RPC (ggf. mehrere Clients) genutzt — geteilter Delta-State
+   würde nebenläufig korrumpieren. So ist eine einzige Instanz sicher.
+3. **Metriken im TUI per Poll-Tick (3 s), Logs per Kanal-Subscription.** Konsistent
+   mit M1-Inventory: das TUI ruft die Module in-process; die Streaming-RPCs sind
+   nur die externe Fläche.
 
-## Repo-Struktur (Änderungen ggü. M0)
+## Stolpersteine / Hinweise
 
-```
-  internal/
-    api/server.go         Ping-, GetInventory-, Attach-Handler + inventory()
-    api/server_test.go    bufconn-Tests: Ping + GetInventory (gemockte Manager)
-    services/             Manager-Interface + SystemdManager + Tests
-    containers/           Manager-Interface + DockerManager + Tests
-    session/session.go    ephemere headless Bubble-Tea-Session
-    daemon/daemon.go      Wiring: Manager-Konstruktion, tui.ForceColors()
-  tui/
-    banner.go             Splash (bleibt) + ForceColors (ANSI-256-Pin)
-    dashboard.go          Dashboard-Model (Tabellen, Tick-Refresh, Farben)
-  cmd/argus/main.go       Raw-Mode-Bridge über den Attach-Stream
-  proto/argus.proto       Ping/GetInventory/Attach (Quelle der Wahrheit)
-```
+- **gopsutil** zieht `tklauser/*`, `power-devops/perfstat`, `yusufpapurcu/wmi`
+  (letztere zwei nur AIX/Windows, indirekt) + `golang.org/x/sys` — alle pure
+  Go; ARM64-Cross verifiziert.
+- **Docker-Stats** sind nicht-blockierend: pro Container ein Stream mit 2 Frames,
+  nebenläufig (Semaphore=8). Einzelne fehlschlagende Container werden
+  übersprungen, nicht der ganze Snapshot.
+- **Goroutine-Lifecycle Logs:** `manager.Stream` cancelt einen abgeleiteten
+  `streamCtx` per `defer`, alle Quellen beenden sich (journalctl-Kill,
+  Docker-Reader-Close). Race-Tests (`go test -race`) grün.
+- **TUI-Logs Generations-Tag:** Filter-/Quellwechsel cancelt den alten Stream;
+  späte `logEntryMsg` aus dem alten Stream werden per `gen` verworfen.
+- **Zeitstempel im Proto:** `int64` Unix-Nanos; Zero-Time → 0 (kein negativer
+  Müllwert für externe Clients). Im In-Process-Pfad wird `time.Time` direkt
+  durchgereicht.
 
-## Make-Targets (unverändert), Lokaltest
+## Verifikation (auf diesem Stand ausgeführt)
 
-```sh
-./bin/argusd --socket /tmp/argusd.sock     # Terminal 1
-./bin/argus  --socket /tmp/argusd.sock     # Terminal 2 → Dashboard, q beendet
-```
-
-`CGO_ENABLED=0` global; alle neuen Deps pure Go: go-systemd/v22 (godbus),
-docker/docker v28 (SDK), bubbletea v1.3, bubbles v1.0, lipgloss.
-
-## Entscheidungen & Stolpersteine (wichtig für M2/M3)
-
-1. **Go auf 1.25 angehoben** (go.mod; das Docker-SDK zog den Toolchain-Bump).
-   Die in M0 gepinnten buf/protoc-gen-Versionen funktionieren weiter; mit
-   Go 1.25 könnten sie jetzt angehoben werden.
-2. **Headless-Farben**: termenv kann am Stream keine Terminal-Caps erkennen →
-   `tui.ForceColors()` pinnt das lipgloss-Profil auf ANSI 256 (Aufruf in
-   `daemon.Run`). M1-Annahme; M3 (virtuelles Terminal) kann das verfeinern.
-3. **`prog.Send` vor `Run` ist safe**: bubbletea v1.3 initialisiert msgs-Channel
-   und Context schon in `NewProgram` — Resize-Events, die vor dem Programmstart
-   eintreffen, blockieren nur kurz und gehen nicht verloren.
-4. **Attach-Lifecycle**: Recv-Loop läuft als Goroutine und killt die Session
-   bei Stream-Fehler; `tea.ErrProgramKilled` wird im Handler als normales
-   Disconnect-Ende behandelt (kein RPC-Fehler). Endet das Programm via „q",
-   schließt der Handler den Stream und die Bridge bekommt `io.EOF` → Exit 0.
-5. **Bridge-Sends serialisieren**: stdin-Goroutine und SIGWINCH-Goroutine
-   senden beide auf den Stream → Mutex-Wrapper `sender` in `cmd/argus`.
-6. **systemd-Fehler vs. Docker-Fehler**: systemd nicht erreichbar → RPC-Fehler
-   bzw. rote Fehlerzeile im Dashboard (Dashboard läuft weiter und retryt beim
-   nächsten Tick). Docker nicht erreichbar → nicht-fatal, Service-Liste
-   erscheint trotzdem + ⚠-Hinweis. Bewusste Asymmetrie: ohne systemd ist auf
-   der Zielplattform etwas grundlegend kaputt.
-7. **docker `Summary.State` ist `string`** (v28-SDK, nicht `ContainerState`) —
-   unconvert meckert sonst.
-8. **ctrl+c in Raw-Mode** erreicht die Bridge als Byte 0x03 und wird ans TUI
-   weitergeleitet (das darauf quittet); SIGINT/SIGTERM von außen canceln den
-   Stream-Context und räumen sauber auf.
-
-## Verifikation (alles auf diesem Stand ausgeführt)
-
-- `make proto` ✅ — buf lint mit aktivierten Standard-Naming-Regeln
-- `make build` / `make cross` ✅ — `file` → „ARM aarch64 … statically linked"
-- `make test` ✅ — table-driven Tests für SystemdManager- und DockerManager-
-  Parsing gegen gemockte Backends (Filter, Sortierung, Slash-Strip,
-  Fehler-Wrapping) + bufconn-Tests für Ping und GetInventory (inkl.
-  Docker-down-mit-Hint und systemd-Fehler-als-RPC-Fehler)
-- `make lint` ✅ — 0 Issues, gofumpt clean
-- E2E (Pseudo-TTY via `script`) ✅ — Attach rendert das Dashboard
-  (Alt-Screen, Tabellen-Header, Statusbar), „q" → Exit 0 + Terminal
-  restauriert; `kill -9` der Bridge mitten in der Session → Daemon läuft
-  weiter und akzeptiert weitere Attaches (drei Sessions nacheinander getestet)
-- ⚠ Sandbox hat kein systemd/Docker — der Live-Datenpfad zeigte hier korrekt
-  den Fehlerpfad; echte Daten bitte einmal auf dem Pi gegenchecken
+- `make proto` ✅ — buf lint grün mit aktiven M1-Naming-Regeln (nur
+  PACKAGE_DIRECTORY_MATCH + SERVICE_SUFFIX bleiben Ausnahme).
+- `make build` / `make cross` ✅ — ARM64 statisch.
+- `make lint` ✅ — 0 Issues, gofumpt clean.
+- `make test` ✅ + `go test -race ./internal/{logs,api,metrics}` ✅.
+  - metrics: Collect-Mapping, CPU%-Formel, Mem-Cache-Abzug, Host-Fehler fatal,
+    Docker-Fehler nicht-fatal.
+  - logs: journalctl-JSON-Parser gegen festen Output, journalArgs (unit/since/
+    priority), Docker-Multiplex-Demux inkl. zerteilter Zeile, Manager-Merge/
+    Quellauswahl/ctx-Cancel/emit-Fehler.
+  - api: bufconn StreamMetrics (echte Felder, Cancel beendet sauber, Collect-
+    Fehler = RPC-Fehler) und StreamLogs (alle Entries, Filter wirkt).
+- **Echtdaten-Smoke (Sandbox):** argusd gestartet, `StreamMetrics` lieferte echte
+  Host-Werte (CPU 0,7 %→1,7 % über zwei Snapshots, RAM/Disk/Net real, Net-Zähler
+  stieg). `StreamLogs` ohne Docker → Quelle nicht-fatal übersprungen; journalctl
+  ist vorhanden und folgt (Stream bleibt offen, bis Client-Deadline → sauberer
+  Server-Abbau).
+- ⚠ **Pi-E2E offen:** Die Sandbox hat kein Docker und keinen befüllten Journal-
+  Zugriff. Bitte auf dem Pi gegenchecken, dass die Metrik-Zeile echte Werte
+  zeigt und der Logs-Tab journald- + Docker-Zeilen mit Filter rendert.
 
 ## Nächste Schritte (nicht begonnen)
 
-- M2: Metriken + Logs.
-- M3: persistente/benannte Sessions, Detach/Reattach, Multi-Attach,
-  virtuelles Terminal mit Delta-Diffing, Panes — `internal/session` ist der
-  Ansatzpunkt, der Attach-Stream bleibt als Transport.
-- M4: start/stop/restart (erste Mutationen, dann Audit-Log).
-- Offen/optional: CI-Workflow, Release-ldflags, Version aus Git-Tag.
+- M3: persistente/benannte Sessions, Detach/Reattach, Multi-Attach, virtuelles
+  Terminal, Panes (dritter Tab kommt hier).
+- M4: start/stop/restart (erste Mutationen, dann Audit-Log in `internal/audit`).
+- M5: Port-Manager (`internal/ports`). M6+: Metrik-Alerts/Schwellwerte.
+  M7: Hermes/MCP (`cmd/argus-mcp` ist noch Stub).

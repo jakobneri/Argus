@@ -16,6 +16,8 @@ import (
 
 	"github.com/jakobneri/argus/internal/api"
 	"github.com/jakobneri/argus/internal/containers"
+	"github.com/jakobneri/argus/internal/logs"
+	"github.com/jakobneri/argus/internal/metrics"
 	"github.com/jakobneri/argus/internal/services"
 	argusv1 "github.com/jakobneri/argus/proto/argusv1"
 	"github.com/jakobneri/argus/tui"
@@ -61,6 +63,8 @@ func (d *Daemon) Run(ctx context.Context) error {
 	argusv1.RegisterArgusServer(srv, api.NewServer(
 		services.NewSystemdManager(),
 		containers.NewDockerManager(),
+		metrics.NewCollector(),
+		logs.NewManager(d.log),
 		d.log,
 	))
 

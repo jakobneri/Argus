@@ -19,7 +19,23 @@ service Argus {
   // Daemon -> client: rendered terminal frames (ANSI bytes).
   // The session ends when the TUI program exits or the stream closes.
   rpc Attach(stream AttachRequest) returns (stream AttachResponse);
+
+  // StreamMetrics streams a host + per-container metrics snapshot on a fixed
+  // interval until the client disconnects. The streamed message wraps a
+  // MetricsSnapshot (the buf STANDARD naming rules require the response type to
+  // be named after the RPC; see proto naming note below).
+  rpc StreamMetrics(StreamMetricsRequest) returns (stream StreamMetricsResponse);
+
+  // StreamLogs streams unified log entries from the systemd journal and/or
+  // Docker until the client disconnects. The streamed message wraps a LogEntry.
+  rpc StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse);
 }
+
+// Proto naming note: the buf STANDARD rules RPC_REQUEST_STANDARD_NAME and
+// RPC_RESPONSE_STANDARD_NAME (re-enabled in M1) require an RPC's request and
+// response messages to be named <Rpc>Request / <Rpc>Response. The streaming
+// RPCs therefore wrap the reusable domain types (MetricsSnapshot, LogEntry) in
+// thin <Rpc>Response envelopes rather than streaming the domain types directly.
 
 message PingRequest {}
 
@@ -71,4 +87,82 @@ message Resize {
 message AttachResponse {
   // Rendered terminal output (ANSI escape sequences included).
   bytes output = 1;
+}
+
+message StreamMetricsRequest {
+  // How often the server emits a snapshot. Zero means the server default (3s).
+  uint32 interval_seconds = 1;
+}
+
+message StreamMetricsResponse {
+  MetricsSnapshot snapshot = 1;
+}
+
+// MetricsSnapshot is one point-in-time reading of host and container metrics.
+message MetricsSnapshot {
+  // Wall-clock time the snapshot was taken, as Unix nanoseconds.
+  int64 timestamp_unix_nano = 1;
+  HostMetrics host = 2;
+  repeated ContainerMetrics containers = 3;
+}
+
+// HostMetrics holds the whole-host resource usage.
+message HostMetrics {
+  // Busy CPU across all cores, 0..100.
+  double cpu_percent = 1;
+  uint64 mem_used_bytes = 2;
+  uint64 mem_total_bytes = 3;
+  uint64 disk_used_bytes = 4;
+  uint64 disk_total_bytes = 5;
+  // Mount point the disk figures refer to (the main mount, "/").
+  string disk_mount = 6;
+  // Cumulative network bytes received / transmitted since boot.
+  uint64 net_rx_bytes = 7;
+  uint64 net_tx_bytes = 8;
+}
+
+// ContainerMetrics holds the resource usage of one running container.
+message ContainerMetrics {
+  string name = 1;
+  // CPU usage normalised to the number of online CPUs, 0..100*ncpu.
+  double cpu_percent = 2;
+  uint64 mem_used_bytes = 3;
+  // Memory limit; zero when the container is unconstrained.
+  uint64 mem_limit_bytes = 4;
+}
+
+// LogSource selects which backends a log stream draws from.
+enum LogSource {
+  // Unspecified is treated as ALL.
+  LOG_SOURCE_UNSPECIFIED = 0;
+  LOG_SOURCE_ALL = 1;
+  LOG_SOURCE_SYSTEMD = 2;
+  LOG_SOURCE_DOCKER = 3;
+}
+
+message StreamLogsRequest {
+  LogSource source = 1;
+  // Optional filter: a systemd unit name and/or a Docker container name. Empty
+  // means no filter (all units / all running containers for the chosen source).
+  string filter = 2;
+  // Optional start point passed through to the backends (e.g. "-1h" or an
+  // absolute "2026-06-15 10:00:00"). Empty means the backend default.
+  string since = 3;
+}
+
+message StreamLogsResponse {
+  LogEntry entry = 1;
+}
+
+// LogEntry is one unified log line from either backend.
+message LogEntry {
+  // Time the entry was logged, as Unix nanoseconds.
+  int64 timestamp_unix_nano = 1;
+  LogSource source = 2;
+  // The systemd unit or Docker container the entry came from.
+  string origin = 3;
+  // Severity ("info", "err", ...) for journald; the stream ("stdout"/"stderr")
+  // for Docker.
+  string level = 4;
+  string message = 5;
 }

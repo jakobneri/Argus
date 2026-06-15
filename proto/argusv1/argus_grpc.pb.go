@@ -19,9 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Argus_Ping_FullMethodName         = "/argus.v1.Argus/Ping"
-	Argus_GetInventory_FullMethodName = "/argus.v1.Argus/GetInventory"
-	Argus_Attach_FullMethodName       = "/argus.v1.Argus/Attach"
+	Argus_Ping_FullMethodName          = "/argus.v1.Argus/Ping"
+	Argus_GetInventory_FullMethodName  = "/argus.v1.Argus/GetInventory"
+	Argus_Attach_FullMethodName        = "/argus.v1.Argus/Attach"
+	Argus_StreamMetrics_FullMethodName = "/argus.v1.Argus/StreamMetrics"
+	Argus_StreamLogs_FullMethodName    = "/argus.v1.Argus/StreamLogs"
 )
 
 // ArgusClient is the client API for Argus service.
@@ -41,6 +43,14 @@ type ArgusClient interface {
 	// Daemon -> client: rendered terminal frames (ANSI bytes).
 	// The session ends when the TUI program exits or the stream closes.
 	Attach(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AttachRequest, AttachResponse], error)
+	// StreamMetrics streams a host + per-container metrics snapshot on a fixed
+	// interval until the client disconnects. The streamed message wraps a
+	// MetricsSnapshot (the buf STANDARD naming rules require the response type to
+	// be named after the RPC; see proto naming note below).
+	StreamMetrics(ctx context.Context, in *StreamMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamMetricsResponse], error)
+	// StreamLogs streams unified log entries from the systemd journal and/or
+	// Docker until the client disconnects. The streamed message wraps a LogEntry.
+	StreamLogs(ctx context.Context, in *StreamLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamLogsResponse], error)
 }
 
 type argusClient struct {
@@ -84,6 +94,44 @@ func (c *argusClient) Attach(ctx context.Context, opts ...grpc.CallOption) (grpc
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Argus_AttachClient = grpc.BidiStreamingClient[AttachRequest, AttachResponse]
 
+func (c *argusClient) StreamMetrics(ctx context.Context, in *StreamMetricsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamMetricsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Argus_ServiceDesc.Streams[1], Argus_StreamMetrics_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamMetricsRequest, StreamMetricsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Argus_StreamMetricsClient = grpc.ServerStreamingClient[StreamMetricsResponse]
+
+func (c *argusClient) StreamLogs(ctx context.Context, in *StreamLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamLogsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Argus_ServiceDesc.Streams[2], Argus_StreamLogs_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamLogsRequest, StreamLogsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Argus_StreamLogsClient = grpc.ServerStreamingClient[StreamLogsResponse]
+
 // ArgusServer is the server API for Argus service.
 // All implementations must embed UnimplementedArgusServer
 // for forward compatibility.
@@ -101,6 +149,14 @@ type ArgusServer interface {
 	// Daemon -> client: rendered terminal frames (ANSI bytes).
 	// The session ends when the TUI program exits or the stream closes.
 	Attach(grpc.BidiStreamingServer[AttachRequest, AttachResponse]) error
+	// StreamMetrics streams a host + per-container metrics snapshot on a fixed
+	// interval until the client disconnects. The streamed message wraps a
+	// MetricsSnapshot (the buf STANDARD naming rules require the response type to
+	// be named after the RPC; see proto naming note below).
+	StreamMetrics(*StreamMetricsRequest, grpc.ServerStreamingServer[StreamMetricsResponse]) error
+	// StreamLogs streams unified log entries from the systemd journal and/or
+	// Docker until the client disconnects. The streamed message wraps a LogEntry.
+	StreamLogs(*StreamLogsRequest, grpc.ServerStreamingServer[StreamLogsResponse]) error
 	mustEmbedUnimplementedArgusServer()
 }
 
@@ -119,6 +175,12 @@ func (UnimplementedArgusServer) GetInventory(context.Context, *GetInventoryReque
 }
 func (UnimplementedArgusServer) Attach(grpc.BidiStreamingServer[AttachRequest, AttachResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Attach not implemented")
+}
+func (UnimplementedArgusServer) StreamMetrics(*StreamMetricsRequest, grpc.ServerStreamingServer[StreamMetricsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamMetrics not implemented")
+}
+func (UnimplementedArgusServer) StreamLogs(*StreamLogsRequest, grpc.ServerStreamingServer[StreamLogsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamLogs not implemented")
 }
 func (UnimplementedArgusServer) mustEmbedUnimplementedArgusServer() {}
 func (UnimplementedArgusServer) testEmbeddedByValue()               {}
@@ -184,6 +246,28 @@ func _Argus_Attach_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Argus_AttachServer = grpc.BidiStreamingServer[AttachRequest, AttachResponse]
 
+func _Argus_StreamMetrics_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamMetricsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ArgusServer).StreamMetrics(m, &grpc.GenericServerStream[StreamMetricsRequest, StreamMetricsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Argus_StreamMetricsServer = grpc.ServerStreamingServer[StreamMetricsResponse]
+
+func _Argus_StreamLogs_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamLogsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ArgusServer).StreamLogs(m, &grpc.GenericServerStream[StreamLogsRequest, StreamLogsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Argus_StreamLogsServer = grpc.ServerStreamingServer[StreamLogsResponse]
+
 // Argus_ServiceDesc is the grpc.ServiceDesc for Argus service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -206,6 +290,16 @@ var Argus_ServiceDesc = grpc.ServiceDesc{
 			Handler:       _Argus_Attach_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "StreamMetrics",
+			Handler:       _Argus_StreamMetrics_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamLogs",
+			Handler:       _Argus_StreamLogs_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "argus.proto",
